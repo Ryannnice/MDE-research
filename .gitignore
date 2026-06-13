@@ -1,0 +1,8 @@
+# 本地工具配置(非调研产出)
+.claude/
+
+# OS / 编辑器噪音
+.DS_Store
+Thumbs.db
+*.swp
+__pycache__/
