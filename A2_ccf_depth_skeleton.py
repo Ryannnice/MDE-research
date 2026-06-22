@@ -32,6 +32,8 @@ def tweedie_x0(backbone, z_t, t, cond):
 def ccf_velocity(backbone, z_t, t_s, t_delta, cond, num_noise=4):
     """返回逼近 z_T→d̂₀ 直线位移的等效恒速场 u_hat。
     赌注核心(§4.9 最毒攻击): u_hat 是否比单点 x0 净增益。自检里用 ablation 开关验证。
+    ⚠️ 偏差陷阱: ChordEdit 原证(附录D)平滑的是零均值噪声→纯降方差;此处 d̂₀ 是有偏 MMSE 锚,
+       时间平均压方差不压偏差。故净增益须靠几何锚纠偏或偏差随 t 变化抵消,不能照搬 ChordEdit 结论。
     """
     d_hat_s  = _drift_to_anchor(backbone, z_t, t_s,           cond, num_noise)
     d_hat_s0 = _drift_to_anchor(backbone, z_t, t_s - t_delta, cond, num_noise)
