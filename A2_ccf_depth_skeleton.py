@@ -8,7 +8,8 @@ A② 免训练单步扩散米制深度 —— CCF→深度 核心机制骨架 + 
 ChordEdit 两端锚都已知(src/tgt prompt)。深度任务目标端 d₀ 未知 → 这里用 Tweedie 代理锚替换。
 
 依赖: torch, diffusers (Marigold pipeline)。本文件用桩函数(stub)跑通逻辑自检,不下权重。
-ponytail: 桩 backbone 自检,真实实验把 backbone 换成 prs-eth/marigold-depth-v1-1。
+ponytail: 桩 backbone 自检,真实实验把 backbone 换成 Day-1 起点 GonzaloMG/marigold-e2e-ft-depth
+          (E2E-FT 单步,§2.1),骨干无关性验证再加 prs-eth/marigold-depth-v1-1。
 """
 import torch
 import torch.nn.functional as F

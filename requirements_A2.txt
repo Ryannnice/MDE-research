@@ -1,0 +1,27 @@
+# A② 免训练单步扩散米制深度 —— GPU 服务器环境
+# 全程纯推理,无训练。单卡 ≥8GB 够跑全部(立项卡 §4.10:算力门槛极低)。
+# 装法:python -m venv .venv && source .venv/bin/activate && pip install -r requirements_A2.txt
+#       torch 按服务器 CUDA 版本另装(见下注)。
+
+# --- 核心(骨干 + 机制)---
+# torch / torchvision:按服务器 CUDA 单独装,例:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+diffusers>=0.32.0,<0.40.0  # MarigoldDepthPipeline 接口按 v0.38 核实;钉上限防跨版本 API 漂移(m5)
+transformers>=4.40.0       # CLIP text_encoder(空 prompt 嵌入)
+accelerate>=0.30.0
+safetensors>=0.4.0
+
+# --- 数据 IO ---
+h5py>=3.10.0               # NYUv2 .mat(首选冒烟数据集)
+numpy>=1.24.0
+Pillow>=10.0.0
+scipy>=1.11.0              # Marigold ensemble 对齐求解器(affine 协议复现 E2E-FT 数字用)
+imageio>=2.31.0           # KITTI/DIODE 深度图读写
+
+# --- 评测/分析 ---
+pandas>=2.0.0             # results.csv 汇总成表
+matplotlib>=3.7.0         # NFE 对齐曲线、bias-var 诊断图、K 阶梯曲线
+
+# --- 可选(骨干无关性证据,Phase 3 最后)---
+# DepthFM:非 diffusers 格式,按 CompVis/depth-fm README 单独 clone + wget ckpt
+# Lotus:  EnVision-Research/Lotus,diffusers 兼容
