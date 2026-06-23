@@ -113,13 +113,30 @@ def predict_relative(bridge, image, t_s=None, use_ccf=False, t_delta=None,
 
 
 def _avg_x0_latent(bridge, z0, t, cond, num_noise, seed_base):
-    """num_noise 个噪声实现的 Tweedie x0(latent)平均。num_noise=1 即纯单点。"""
+    """num_noise 个噪声实现的 Tweedie x0(latent)平均。num_noise=1 即纯单点。
+    ⚠️ 语义:z0 是【起点 latent】(纯噪声端或 init_noise)。num_noise=1 时直接对 z0 投影;
+       num_noise>1 时对 z0 **再加噪**取多实现平均。**不要**把"已是干净 x0、需重去噪一步"的
+       latent 喂进来——那会被当起点再加噪,造成双重加噪(round-5 B5 坑)。重去噪走 _renoise_denoise。"""
     if num_noise == 1:
         return bridge.tweedie_x0(z0, t, cond)
     acc = 0.0
     for k in range(num_noise):
         z = bridge.draw_z(z0, t, seed_base * 100 + k)
         acc = acc + bridge.tweedie_x0(z, t, cond)
+    return acc / num_noise
+
+
+def _renoise_denoise(bridge, x0_clean, t_s, cond, num_noise, seed_base):
+    """把【干净】x0 重加噪到 t_s 再原生去噪。多步采样第 ≥2 步专用(§4.7 机制本体)。
+    🔴 round-5 B5 修复:此前先 draw_z(x0)→z_re,再把 z_re 喂 _avg_x0_latent,
+       而后者 num_noise>1 会**再次** draw_z(z_re) → 双重加噪。烘焙锚到达骨干的信号系数从
+       预期 √ab 退化成 ab(t=499 处 0.28→0.078,~3.6× 衰减),机制被严重欠驱动。
+       正解:对**同一个干净 x0** 做 num_noise 个独立"再加噪→Tweedie"实现取平均(只加噪一次)。
+    """
+    acc = 0.0
+    for k in range(num_noise):
+        z_re = bridge.draw_z(x0_clean, t_s, seed_base * 100 + k)   # 干净 x0 → t_s,仅一次
+        acc = acc + bridge.tweedie_x0(z_re, t_s, cond)
     return acc / num_noise
 
 
@@ -153,40 +170,64 @@ def arm_postproc_patch(bridge, sample, anchor, cfg):
 
 
 def arm_postproc_patch_ccf(bridge, sample, anchor, cfg):
-    """arm B':patch-affine 后处理,但作用在**与 arm C 同源的 CCF 相对深度**上。
-    🔴 round-2 #2 修复(2026-06-23 复核):C-vs-B' 唯一差异 = 几何锚施加位置
-       (采样期烘焙 vs 解码后后处理),base predictor 完全相同 → Linchpin-1 的**干净单变量**对照。
-    判据升级:C < B' 才证"采样期注入 > 后处理"(C < B 只证"全系统更好",含基底功劳)。"""
-    dr = _relative_for_arm(bridge, sample, cfg, use_ccf=True)
-    return ground_to_metric(dr, anchor, grid=cfg.get("grid", (4, 4)), use_dense=True,
+    """arm B':patch-affine 后处理,作用在**与 arm C 逐位匹配的 CCF 多步相对深度**上。
+    🔴 round-2 #2 + round-4 B4 修复:C 与 B' 共享同一采样例程 `_sample_relative_latent`,
+       唯一差异 = `bake`(B'=False 不在采样期注入锚,只末步后处理;C=True 采样期烘焙 + 骨干重去噪)。
+       同骨干、同 t_schedule、同 CCF、同 num_noise、同末步 ground_to_metric → Linchpin-1 **干净单变量**。
+    判据:C < B' 才证"采样期注入 > 后处理"。C < B 只证"全系统更好"(含 CCF 多步基底之功)。"""
+    d_rel = _sample_relative_latent(bridge, sample, cfg, anchor=anchor, bake=False)
+    return ground_to_metric(d_rel, anchor, grid=cfg.get("grid", (4, 4)), use_dense=True,
                             pin_anchors=cfg.get("pin_anchors", False),
                             pin_weight=cfg.get("pin_weight", 1.0))
+
+
+def _sample_relative_latent(bridge, sample, cfg, anchor=None, bake=False):
+    """统一的(多步)CCF 采样 → 相对深度 [0,1]。arm C(bake=True)与 arm B'(bake=False)共用。
+    🔴 round-4 B4 修复:§4.7 卖点"采样期注入经骨干先验传播到无锚区"**需要烘焙后再去噪一步**
+       才发生。此前 L1 单步(schedule=[T]),骨干从不重处理烘焙 latent → 机制根本没被测,
+       arm C 退化成"额外 VAE 往返 + 双 affine"。现在:
+         第 1 步(纯噪声端 t=T):CCF 多时间点出 x0,(bake 则)烘焙锚;
+         第 ≥2 步(中段 t):把上一步 x0 **重加噪到 t_s 再原生去噪**(骨干传播锚到无锚区),
+                            (bake 则)再烘焙。第 ≥2 步用**原生 Tweedie 非 CCF**,
+                            避开 e2eft 低 t 未标定区(M1)。
+       这正是立项卡 §4.11 B2(1 步加速 + 1 步几何近端细化)的落地。"""
+    cond = bridge.encode_cond(sample["image"])
+    z = bridge.init_noise(sample["image"])
+    schedule = cfg.get("t_schedule", [len(bridge.alphas_cumprod) - 1])
+    nn = cfg.get("num_noise", 4)
+    seed = cfg.get("seed", 0)
+    x0 = None
+    for i, t_s in enumerate(schedule):
+        if i == 0:
+            x0 = _ccf_u(bridge, z, t_s, cfg, cond) if cfg.get("use_ccf", True) \
+                else _avg_x0_latent(bridge, z, t_s, cond, nn, seed)
+        else:
+            # 把【干净】x0 重加噪到 t_s 再原生去噪(num_noise 个再加噪实现取平均)
+            x0 = _renoise_denoise(bridge, x0, t_s, cond, nn, seed + 100 * i)
+        if bake:
+            x0 = _bake_x0(bridge, x0, anchor, cfg)              # 烘焙锚 → 下一步骨干会传播它
+    return bridge.decode_depth(x0)[0, 0]                         # 相对域 [0,1]
+
+
+def _bake_x0(bridge, x0, anchor, cfg):
+    """把几何锚烘焙进一个 x0 latent,返回烘焙后的 x0 latent(复用 bake_geo_latent)。"""
+    zeros = torch.zeros_like(x0)
+    u = bake_geo_latent(bridge, zeros, x0, anchor,
+                        ground_grid=cfg.get("grid", (4, 4)),
+                        pin_anchors=cfg.get("pin_anchors", False),
+                        pin_weight=cfg.get("pin_weight", 1.0))
+    return zeros + u                                            # = 烘焙后的 x0
 
 
 def arm_sample_geo_local(bridge, sample, anchor, cfg):
-    """arm C:采样期几何锚注入(局部锚)。CCF + 采样期 bake_geo_latent + 末步接地。
+    """arm C:采样期几何锚注入(局部锚)。多步 CCF 采样 + 每步烘焙锚 + 末步接地。
     🔴 B1 修复:bake_geo_latent 与 arm B 共用 ground_to_metric,pin_anchors 同值 → 锚信息量一致。
-    🔴 B3 修复(2026-06-23 round-3 复核):latent 是 affine-invariant **相对**域,decode 出来恒是 [0,1]。
-       此前直接返回相对深度却按 metric 协议评(GT 0-10m)→ arm C 必输每个后处理臂,
-       Linchpin-1 得反向错误结论(单位错,非机制)。修复:末步补一次 ground_to_metric,
-       与 arm B' **同原语**收尾 → C-vs-B' 唯一差异 = 采样期是否烘焙了锚(改造相对基底 + 经
-       decode→encode 往返传播到无锚区),而非单位。这正是 §4.7/§4.8 卖点的干净单变量对照。
+    🔴 B3 修复(round-3):latent 是 affine-invariant **相对**域,decode 恒 [0,1];末步补 ground_to_metric,
+       与 arm B' 同原语收尾 → 单位一致。
+    🔴 B4 修复(round-4):用 `_sample_relative_latent(bake=True)` 多步采样,使骨干在烘焙后**重去噪一步**,
+       §4.7"采样期注入传播到无锚区"机制才真正发生。C-vs-B'(bake=False)= 干净单变量(唯一差异=采样期是否烘焙)。
     """
-    cond = bridge.encode_cond(sample["image"])
-    z = bridge.init_noise(sample["image"])
-    T = len(bridge.alphas_cumprod) - 1
-    schedule = cfg.get("t_schedule", [T])
-    for t_s in schedule:
-        d_s = _avg_x0_latent(bridge, z, t_s, cond, cfg.get("num_noise", 4), cfg.get("seed", 0))
-        u = d_s - z if not cfg.get("use_ccf", True) else \
-            (_ccf_u(bridge, z, t_s, cfg, cond) - z)
-        u = bake_geo_latent(bridge, z, u, anchor,
-                            ground_grid=cfg.get("grid", (4, 4)),
-                            pin_anchors=cfg.get("pin_anchors", False),
-                            pin_weight=cfg.get("pin_weight", 1.0))
-        z = z + u
-    d_rel = bridge.decode_depth(z)[0, 0]                   # 相对域 [0,1](latent 本质)
-    # 🔴 B3:末步接地成米制,与 arm B' 同原语 → 唯一差异回归"采样期是否烘焙锚"
+    d_rel = _sample_relative_latent(bridge, sample, cfg, anchor=anchor, bake=True)
     return ground_to_metric(d_rel, anchor, grid=cfg.get("grid", (4, 4)), use_dense=True,
                             pin_anchors=cfg.get("pin_anchors", False),
                             pin_weight=cfg.get("pin_weight", 1.0))
@@ -421,7 +462,11 @@ def run_diag(args, bridge):
                        align_affine=not args.mock)        # 真机开 #3 affine 对齐,mock 关
         for arm, dec in res["decomp"].items():
             r = _blank_row(args, dataset, arm, sample["id"])
-            r.update({"abs_bias": dec["abs_bias"], "var": dec["var"],
+            # 🔴 round-4 minor:用 align 列标 frame,避免攻击腿(对齐)与几何腿(未对齐)
+            #    在同列被跨 frame 误比。几何腿 b_ccf_geo 始终未对齐(#3-bis),其余随 align_affine。
+            frame = "unaligned" if arm == "b_ccf_geo" else \
+                    ("aff_aligned" if not args.mock else "unaligned")
+            r.update({"align": frame, "abs_bias": dec["abs_bias"], "var": dec["var"],
                       "absrel": dec.get("rmse", float("nan")),
                       "attack_survives": int(res["verdict"]["attack_4_9_survives"])})
             rows.append(r)
@@ -447,8 +492,28 @@ def _phase_configs(args, seed):
             out.append((f"C_nfe{nfe}", arm_sample_geo_local, cfg, nfe))
         return out
     arms = PHASE_ARMS[args.phase]
-    nfe = 1 if args.phase == "L0" else 2
-    return [(name, fn, dict(common), nfe) for name, fn in arms.items()]
+    # 🔴 B4 修复:L1 采样臂(C/D/B')须多步,骨干才会重去噪烘焙后的 latent(§4.7 机制);
+    #    后处理臂(A/B)无采样,保持单步。机制 schedule = [T, T//2](第 2 步 t≈499,M1-safe,
+    #    不落 e2eft 低 t 未标定区)。这正是立项卡 §4.11 B2(1 步加速 + 1 步几何近端细化)。
+    sampling_arms = {"C_sample_geo_local", "D_sample_geo_global", "Bp_postproc_patch_ccf"}
+    T = 999                                                   # diffusion 标准步数(bridge alphas_cumprod 长 1000)
+    out = []
+    for name, fn in arms.items():
+        cfg = dict(common)
+        if args.phase == "L1" and name in sampling_arms:
+            cfg["t_schedule"] = _mechanism_schedule(T)       # 2 步(B2)
+            nfe = 2
+        else:
+            nfe = 1
+        out.append((name, fn, cfg, nfe))
+    return out
+
+
+def _mechanism_schedule(T):
+    """L1 机制测试 schedule:[T, T//2]。第 1 步纯噪声端 CCF + 烘焙,第 2 步中段重去噪传播锚。
+    🔴 B4:第 2 步落 t≈T/2(非近 0),既给骨干重处理空间,又避开 e2eft 低 t 未标定区(M1)。
+       Marigold(DDIM 1–4 步)天然支持;e2eft 多步属 off-distribution,L1 机制测试建议主跑 Marigold。"""
+    return [T, T // 2]
 
 
 def _nfe_schedule(T, nfe):
@@ -611,12 +676,51 @@ def _self_check():
     assert abs(predC.max().item() - predBp.max().item()) < 0.6 * predBp.max().item(), \
         f"B3 回归:C({predC.max():.2f})/B'({predBp.max():.2f}) 量程差过大,非同单位对照"
 
+    # 🔴 B4 回归(round-4):L1 采样臂(C/D/B')必须多步(≥2),骨干才会重去噪烘焙后的 latent,
+    #    §4.7"采样期注入传播到无锚区"机制才真正被测。单步退化 = 仅 VAE 往返,机制没测到。
+    A.phase = "L1"
+    cfgs = {name: cfg for name, _, cfg, _ in _phase_configs(A, seed=0)}
+    for name in ("C_sample_geo_local", "D_sample_geo_global", "Bp_postproc_patch_ccf"):
+        sched = cfgs[name].get("t_schedule", [999])
+        assert len(sched) >= 2, f"B4 回归:L1 采样臂 {name} 仍单步({sched}),机制未被测"
+    # 后处理臂(A/B)应保持单步(无采样,不需重去噪)
+    assert len(cfgs["A_postproc_global"].get("t_schedule", [999])) == 1, "A 应单步"
+
+    # 🔴 B5 回归(round-5):多步第 ≥2 步"重去噪"不得依赖 num_noise(双重加噪坑)。
+    #    用 z-敏感桩(tweedie 恒等回传 z,real √ab 加噪公式)测烘焙 latent 到达骨干的信号系数:
+    #    应 ≈ √ab 且 num_noise=1 与 4 一致(双重加噪会让 nn>1 退化成 ab,远小于 √ab)。
+    #    注意:_MockBridge.draw_z 用 z0+0.01randn(非真实加噪),测不出此坑,故另起专用桩。
+    class _ZSensBridge:
+        def __init__(s):
+            s.alphas_cumprod = torch.cumprod(1 - torch.linspace(1e-4, 0.02, 1000), 0)
+        def draw_z(s, z0, t, seed):
+            ab = s.alphas_cumprod[int(t)]
+            g = torch.Generator().manual_seed(int(seed))
+            return ab.sqrt() * z0 + (1 - ab).sqrt() * torch.randn(z0.shape, generator=g)
+        def tweedie_x0(s, z_t, t, cond):
+            return z_t                                   # 恒等:输出携带的信号系数即被测量
+    zb = _ZSensBridge()
+    # 🔴 round-6 复核:latent 须够大,否则 t=499 处系数估计方差大 → 正确实现也有 ~15% 假失败率
+    #    (实测 (1,4,8,8)=14.8% vs (1,4,32,32)=0.8%)。32×32 锁住脆性,buggy 仍 100% 被抓。
+    x0c = torch.randn(1, 4, 32, 32)                      # 干净 x0(够大,降估计方差)
+    t2 = 499
+    sqrt_ab = zb.alphas_cumprod[t2].sqrt().item()
+    def _coeff(nn):
+        out = _renoise_denoise(zb, x0c, t2, None, nn, seed_base=1)
+        return (out * x0c).sum().item() / (x0c * x0c).sum().item()
+    c1, c4 = _coeff(1), _coeff(4)
+    assert abs(c1 - sqrt_ab) < 0.1 and abs(c4 - sqrt_ab) < 0.1, \
+        f"B5 回归:重去噪信号系数偏离 √ab={sqrt_ab:.3f}(c1={c1:.3f} c4={c4:.3f}),疑双重加噪复发"
+    assert abs(c1 - c4) < 0.08, \
+        f"B5 回归:重去噪系数随 num_noise 变(c1={c1:.3f} c4={c4:.3f}),双重加噪坑复发"
+
     # M4 回归:nfe_real 列存在
     A.phase = "L2"; rows = run_grid(A, bridge)
     assert all("nfe_real" in r for r in rows), "M4:nfe_real 列缺失"
 
     print("自检通过: L0/L1/L2/diag 贯通,CSV 完整,B1 公平性(无偷看),"
-          "B3 米制接地(C/B' 同量程),M4 NFE 列就位")
+          "B3 米制接地(C/B' 同量程),B4 L1采样臂多步(机制可测),"
+          "B5 重去噪无双重加噪(信号系数√ab、num_noise无关),M4 NFE 列就位")
 
 
 def main():

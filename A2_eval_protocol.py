@@ -104,8 +104,13 @@ def align_global_lstsq(pred, gt, mask):
     if p.numel() < 2:
         return pred.clone()
     A = torch.stack([p, torch.ones_like(p)], dim=1)   # [M,2]
-    sol = torch.linalg.lstsq(A, g.unsqueeze(1)).solution.squeeze(1)
+    # 🔴 round-4 minor:用 ridge 正规方程而非裸 lstsq。CUDA 'gels' 驱动遇秩亏(近恒定
+    #    预测)会出 NaN/崩;(AᵀA+λI) 解恒稳定。λ 极小只为数值稳定,不偏离最小二乘解。
+    AtA = A.t() @ A + 1e-6 * torch.eye(2, dtype=A.dtype, device=A.device)
+    sol = torch.linalg.solve(AtA, A.t() @ g.unsqueeze(1)).squeeze(1)
     s, t = sol[0], sol[1]
+    if not (torch.isfinite(s) and torch.isfinite(t)):     # 退化兜底:近恒定预测
+        return pred.clone()
     return s * pred + t
 
 
