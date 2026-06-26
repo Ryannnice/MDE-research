@@ -23,7 +23,7 @@
 | 10 | 参考文献分类归档清单(80 篇) | 归档 |
 | 11 | 事实核查说明与信息来源 | 核查 |
 
-配套文件:`papers/00_References/Monocular_Depth_Estimation_A_Survey.pdf`(原论文)、`papers/`(80 篇按 10 类归档,已下载 59 + `11_FoundationModels_补充/` 7 篇)、`docs/archive/可扩展研究方向.md`(科研选题)。
+配套文件:`papers/00_References/Monocular_Depth_Estimation_A_Survey.pdf`(原论文)、`papers/`(80 篇按 10 类归档,已下载 59 + `11_FoundationModels_补充/` 7 篇)、`docs/04_MDE_ideas.md`(科研选题)。
 
 ---
 
@@ -317,7 +317,7 @@ MiDaS 路线的代价是丢了绝对尺度。**ZoeDepth**(Bhat 等,arXiv:2302.12
 
 把上面这条时间线叠到原论文上可以看清:**它实质是一篇"前基础模型时代"的总结**。它对 2014–2022 的监督/自监督/半监督 CNN 方法梳理得当,但恰好错过了 2023–2024 让 MDE 从"实验室刷榜"走向"通用工具"的范式转移。
 
-> 本章 7 篇代表作已下载归档至 `papers/11_FoundationModels_补充/`,可直接对照阅读;更前沿的少步扩散深度、外部方法借鉴(ChordEdit)见 `docs/archive/MDE_前沿深度追踪.md` B3(扩散深度主线)与 `docs/archive/可扩展研究方向.md` §4。
+> 本章 7 篇代表作已下载归档至 `papers/11_FoundationModels_补充/`,可直接对照阅读;更前沿的少步扩散深度、外部方法借鉴(ChordEdit)见 `docs/03_MDE_frontier.md` B3(扩散深度主线)与 `docs/04_MDE_ideas.md` §4。
 
 
 ---
@@ -482,9 +482,8 @@ MiDaS 路线的代价是丢了绝对尺度。**ZoeDepth**(Bhat 等,arXiv:2302.12
 ## 12. 配套文件
 
 - `papers/00_References/Monocular_Depth_Estimation_A_Survey.pdf` —— 原论文
-- **本文件 `docs/archive/单目深度估计综述_完整调研报告.md`** —— 逐节通读 + 深度解读 + 文献归档(合订本,由原 `完整调研报告_逐节通读.md` 与 `单目深度估计综述_深度调研.md` 合并)
+- **本文件 `docs/05_MDE_survey.md`** —— 逐节通读 + 深度解读 + 文献归档(合订本,由原 `完整调研报告_逐节通读.md` 与 `单目深度估计综述_深度调研.md` 合并)
 - `papers/` —— 80 篇参考文献按 10 类归档(已下载 59)+ `11_FoundationModels_补充/`(7 篇基础模型代表作)
 - `papers/_download_report.tsv` —— 逐条下载状态
-- `docs/archive/可扩展研究方向.md` —— 从本综述出发的科研选题(含 HDR×深度、标定不确定性、零样本米制深度等,及 ChordEdit 外部方法借鉴评估)
-
+- `docs/04_MDE_ideas.md` —— 从本综述出发的科研选题(含 HDR×深度、标定不确定性、零样本米制深度等,及 ChordEdit 外部方法借鉴评估)
 

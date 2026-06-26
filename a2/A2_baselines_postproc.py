@@ -5,7 +5,7 @@ Linchpin-1:采样期几何锚注入(臂C) 必须 > 后处理几何标定。
 本文件实现后处理臂,它们用**稀疏锚**(来自 A2_geo_anchor.AnchorSet,与臂C 同源)把
 相对深度 pred_rel 接地成米制。臂C 要赢的就是这里的臂B。
 
-四臂(与 A2_实验方案.md / skeleton 对齐):
+四臂(与 docs/02_A2_experiments.md / skeleton 对齐):
   臂A  global_affine       —— 全局 scale+shift,2-DOF。最弱对照(GeoDiff 那侧的下界)
   臂B  patch_affine        —— AnchorD 式,patch 网格各拟合 affine + 双线性平滑。**真对照,门槛**
   臂C  采样期注入          —— 在 A2_ccf_depth_skeleton.sample_metric_depth(use_geo=True),不在本文件

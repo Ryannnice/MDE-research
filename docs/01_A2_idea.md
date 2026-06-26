@@ -76,14 +76,14 @@ RGB I
 
 ### Minimum Experiments
 
-直接复用 `experiments/A2_training_free_single_step_metric/A2_run_grid.py`:
+直接复用 `a2/A2_run_grid.py`:
 
 ```bash
-cd experiments/A2_training_free_single_step_metric
-python A2_run_grid.py --phase L0 --backbone e2eft --dataset nyu --root ../../data/nyu --seeds 0 1 2 --num_noise 4 --out ../../runs/L0_nyu.csv
-python A2_run_grid.py --phase diag --backbone e2eft --dataset nyu --root ../../data/nyu --K 8 --seeds 0 1 2 --num_noise 4 --out ../../runs/diag_nyu.csv
-python A2_run_grid.py --phase L1 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu --root ../../data/nyu --K 1 2 4 8 16 32 --seeds 0 1 2 --out ../../runs/L1_nyu.csv
-python A2_run_grid.py --phase L2 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu --root ../../data/nyu --nfe 1 2 4 8 --seeds 0 1 2 --out ../../runs/L2_nyu.csv
+cd a2
+python A2_run_grid.py --phase L0 --backbone e2eft --dataset nyu --root ../data/nyu --seeds 0 1 2 --num_noise 4 --out ../runs/L0_nyu.csv
+python A2_run_grid.py --phase diag --backbone e2eft --dataset nyu --root ../data/nyu --K 8 --seeds 0 1 2 --num_noise 4 --out ../runs/diag_nyu.csv
+python A2_run_grid.py --phase L1 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu --root ../data/nyu --K 1 2 4 8 16 32 --seeds 0 1 2 --out ../runs/L1_nyu.csv
+python A2_run_grid.py --phase L2 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu --root ../data/nyu --nfe 1 2 4 8 --seeds 0 1 2 --out ../runs/L2_nyu.csv
 ```
 
 ---

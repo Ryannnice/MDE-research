@@ -6,9 +6,9 @@
 
 ## 当前入口
 
-- `docs/A2.md`: 当前主线短说明。
+- `docs/00_A2.md`: 当前主线短说明。
 - `a2/`: 当前实验代码。
-- `docs/archive/`: 旧长文归档,只作查证材料。
+- `docs/01_A2_idea.md` 到 `docs/05_MDE_survey.md`: 旧长文,只作查证材料。
 - `papers/`: 论文 PDF。
 
 ## 命令

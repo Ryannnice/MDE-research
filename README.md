@@ -8,9 +8,13 @@
 
 | 路径 | 作用 |
 |---|---|
-| [`docs/A2.md`](docs/A2.md) | 当前主线的短说明、判据和命令 |
+| [`docs/00_A2.md`](docs/00_A2.md) | 当前主线的短说明、判据和命令 |
 | [`a2/`](a2/) | A2 实验代码和依赖 |
-| [`docs/archive/`](docs/archive/) | 旧长文、调研、完整实验方案归档 |
+| [`docs/01_A2_idea.md`](docs/01_A2_idea.md) | A2 idea map |
+| [`docs/02_A2_experiments.md`](docs/02_A2_experiments.md) | A2 长版实验方案 |
+| [`docs/03_MDE_frontier.md`](docs/03_MDE_frontier.md) | MDE 前沿追踪 |
+| [`docs/04_MDE_ideas.md`](docs/04_MDE_ideas.md) | 旧选题池 |
+| [`docs/05_MDE_survey.md`](docs/05_MDE_survey.md) | 综述通读 |
 | [`papers/`](papers/) | 论文 PDF |
 | [`tools/`](tools/) | 辅助脚本 |
 

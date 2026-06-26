@@ -1,6 +1,6 @@
 # A② 实验方案 —— 免训练单步扩散米制深度
 
-> 配套立项卡:`docs/ideas/可扩展研究方向.md` §4。本文件 = 从立项卡到可执行实验的工程落地层。
+> 配套立项卡:`docs/04_MDE_ideas.md` §4。本文件 = 从立项卡到可执行实验的工程落地层。
 > 生成:2026-06-22 · 扩充执行层:2026-06-23(深挖 + 全套可跑脚本)
 > 方法:代码资产取证(WebFetch 实锤 5 库 repo/license/权重)+ 两 Linchpin 转最便宜先证伪序列 + CCF→深度核机制代码自检
 > 一句话定位:**这是一个算力极轻、科学风险极重的项目。瓶颈不是 GPU,是 §4.4/§4.7 两个赌注能否实证成立。整个方案围绕"用最便宜的实验最快证伪"组织。**
@@ -207,7 +207,7 @@
    - **#1 geo 单位不一致(B2 本应修的腿反而废了)**:`run_diag` 传给诊断器的几何锚 tgt 是**米制**(1–8m+),而三臂输出与 truth 已归一化到 [0,1] → 米制值塞进 [0,1] 场,`geo_corrects_bias` 恒判 False(实证 `b_ccf_geo abs_bias` 从 base 的 0.10 爆到 1.04)。**修复**:geo tgt 用与 `truth_depth` **同一 min-max** 归一化到 [0,1] 同 frame;实证回落到 0.09(正确纠偏)。
    - **#2 L1 命门 base predictor 不对称**:arm B 单步单噪、arm C 多噪 CCF → `C<B` 含"CCF 基底更强"的功劳,非纯"注入位置"之功,Linchpin-1 头条对照不单变量。**修复**:新增 arm B'(`Bp_postproc_patch_ccf`)= 与 arm C **同源 CCF 相对深度**上做 patch-affine 后处理;`C<B'` 才是干净单变量判据(注入位置:采样烘焙 vs 解码后后处理)。B 保留为便宜全系统基线。
    - **#3 度量 frame 不一致(moderate)**:Marigold 出 affine-invariant 相对深度,与 min-max GT 差未知全局 affine;abs_bias 绝对量被污染。**修复**:`bias_variance_decomp` 加 `align_affine`,分解前对每臂做全局 (s,t) 最小二乘对齐到 truth,剥离合法 affine 自由度,剩结构偏差;局部几何锚修正是局部的,全局对齐抹不掉 → geo 腿仍显纠偏。真机开,mock 关。
-   - **#4 minor**:skeleton docstring model_id 对齐 E2E-FT Day-1 起点;`experiments/A2_training_free_single_step_metric/requirements_A2.txt` 钉 `diffusers>=0.32,<0.40`(接口按 v0.38 核实,防未来版漂移);失败切片距离图用 `scipy.ndimage.distance_transform_edt` 替纯 Python 双循环。
+   - **#4 minor**:skeleton docstring model_id 对齐 E2E-FT Day-1 起点;`a2/requirements.txt` 钉 `diffusers>=0.32,<0.40`(接口按 v0.38 核实,防未来版漂移);失败切片距离图用 `scipy.ndimage.distance_transform_edt` 替纯 Python 双循环。
 9. **🔴 第三轮复核:又抓一个 blocker(B3)+ 一个 frame 修正(2026-06-23,同一审稿视角验修复 diff)**——前两轮修复在相邻处又暴露问题,继续留痕:
    - **🔴 B3 arm C 未接地,按米制协议评必输(最隐蔽)**:latent 是 affine-invariant **相对**域,`arm_sample_geo_local` 末步 `decode_depth(z)` 恒出 [0,1],却按 metric 协议与 GT 0-10m 比 → arm C 必输每个后处理臂,Linchpin-1 得**反向错误结论**(单位错,非机制)。实测同源 CCF 基底下 C(相对)absrel≈0.90 vs 接地后≈0.02。**修复**:arm C 末步补 `ground_to_metric`,与 arm B' **同原语**收尾 → C-vs-B' 唯一差异回归"采样期是否烘焙锚"。加 B3 回归自检(断言 arm C 输出落米制量程、C/B' 同量程)。
    - **#3-bis 几何锚腿不能参与 affine 对齐(frame 概念冲突)**:round-2 #3 给攻击腿加 align_affine 剥离仿射自由度是对的,但几何锚的贡献**就是绝对接地**,全局 align 会把它撤销(实测支撑区 bias 从 0.000 被 align 搬到 0.051,geo_corrects 误翻 False)。**修复**:`diagnose` 两条防守腿用**不同 frame**——攻击腿(a/c/b)用 align_affine 分解看结构偏差;几何腿(b vs b_geo)**始终未对齐**、在锚支撑区度量纠偏。docstring 过度声称("全局对齐抹不掉局部修正")改为有条件表述。加 align_affine+geo 路径自检(此前真机恒开、mock 恒关 → 该组合从未被测的覆盖盲区)。
@@ -250,17 +250,17 @@
 | `A2_failure_slices.py` | **失败模式切片**(CV 顶会硬要求) | 远距离退化 / 无锚衰减 / 反光失败 / 距离图 / 分桶守恒 | 真实语义掩膜替换合成 |
 | `A2_run_grid.py` | **网格 driver**(执行入口) | L0/L1/L2 全 phase 流水线贯通,CSV 完整 | `--root` 指真数据集 |
 
-> 验证全部自检一条命令:`cd experiments/A2_training_free_single_step_metric && for f in A2_ccf_depth_skeleton A2_geo_anchor A2_eval_protocol A2_baselines_postproc A2_diag_bias_var A2_marigold_bridge A2_failure_slices A2_run_grid; do python $f.py; done`
-> 环境:`cd experiments/A2_training_free_single_step_metric && pip install -r requirements_A2.txt`(torch 按服务器 CUDA 另装)。
+> 验证全部自检一条命令:`cd a2 && for f in A2_ccf_depth_skeleton A2_geo_anchor A2_eval_protocol A2_baselines_postproc A2_diag_bias_var A2_marigold_bridge A2_failure_slices A2_run_grid; do python $f.py; done`
+> 环境:`cd a2 && pip install -r requirements.txt`(torch 按服务器 CUDA 另装)。
 
 ### 8.2 建议目录结构
 
 ```
 MDE/
-├── docs/experiments/A2_实验方案.md
-├── experiments/A2_training_free_single_step_metric/
+├── docs/02_A2_experiments.md
+├── a2/
 │   ├── A2_*.py                # 七脚本 + driver(真实代码)
-│   └── requirements_A2.txt    # 依赖
+│   └── requirements.txt       # 依赖
 ├── data/                      # 数据集(GPU 服务器下载,见 §10)
 │   ├── nyu/nyu_depth_v2_labeled.mat
 │   ├── kitti/{eigen_test_files.txt, raw/, calib/}
@@ -334,8 +334,8 @@ MDE/
 
 ```bash
 # ---- Phase 0:环境 + 基线复现冒烟(2–3 天,零风险)----
-cd experiments/A2_training_free_single_step_metric
-pip install -r requirements_A2.txt
+cd a2
+pip install -r requirements.txt
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib          # WSL cuDNN 坑(§13)
 # 全脚本自检(无 GPU 也过)= 确认流水线逻辑未坏
 for f in A2_ccf_depth_skeleton A2_geo_anchor A2_eval_protocol \
@@ -345,29 +345,29 @@ for f in A2_ccf_depth_skeleton A2_geo_anchor A2_eval_protocol \
 done
 # 复现 E2E-FT 单步数(affine 协议):应得 NYU AbsRel≈5.2 / δ1≈96.6(±10% 为 GATE-0 PASS)
 python A2_run_grid.py --phase L0 --backbone e2eft --dataset nyu \
-    --root ../../data/nyu --limit 654 --seeds 0 --out ../../runs/P0_repro.csv
+    --root ../data/nyu --limit 654 --seeds 0 --out ../runs/P0_repro.csv
 
 # ---- Phase 1:L0 + L1 联合证伪(第 1 周,最致命)----
 # L0:CCF vs 单点 vs 多噪声(affine 协议),3 seed
 python A2_run_grid.py --phase L0 --backbone e2eft --dataset nyu \
-    --root ../../data/nyu --seeds 0 1 2 --num_noise 4 --out ../../runs/L0_nyu.csv
+    --root ../data/nyu --seeds 0 1 2 --num_noise 4 --out ../runs/L0_nyu.csv
 # L0 纠偏诊断(§4.9 最毒攻击 bias-var,真实 backbone 路径,B2 已接通):
 python A2_run_grid.py --phase diag --backbone e2eft --dataset nyu \
-    --root ../../data/nyu --K 8 --seeds 0 1 2 --num_noise 4 --out ../../runs/diag_nyu.csv
+    --root ../data/nyu --K 8 --seeds 0 1 2 --num_noise 4 --out ../runs/diag_nyu.csv
 # (本地无 GPU 仅验仪器逻辑:python A2_diag_bias_var.py)
 # L1:patch-affine 对照 vs 采样注入,扫 K 阶梯(metric 协议)
 python A2_run_grid.py --phase L1 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu \
-    --root ../../data/nyu --K 1 2 4 8 16 32 --seeds 0 1 2 --out ../../runs/L1_nyu.csv
+    --root ../data/nyu --K 1 2 4 8 16 32 --seeds 0 1 2 --out ../runs/L1_nyu.csv
 
 # ---- Phase 2:L2 NFE 对齐曲线(第 2–3 周,仅 GATE-1 PASS 后)----
 python A2_run_grid.py --phase L2 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu \
-    --root ../../data/nyu --nfe 1 2 4 8 16 --seeds 0 1 2 --out ../../runs/L2_nyu.csv
+    --root ../data/nyu --nfe 1 2 4 8 16 --seeds 0 1 2 --out ../runs/L2_nyu.csv
 
 # ---- Phase 3:主实验全基准 + 骨干无关性(第 4–6 周)----
 for bb in e2eft marigold lotus; do
   for ds in nyu kitti eth3d diode; do
     python A2_run_grid.py --phase L1 --backbone $bb --dataset $ds \
-        --root ../../data/$ds --K 4 8 --seeds 0 1 2 --out ../../runs/main_${bb}_${ds}.csv
+        --root ../data/$ds --K 4 8 --seeds 0 1 2 --out ../runs/main_${bb}_${ds}.csv
   done
 done
 ```
@@ -381,7 +381,7 @@ done
 汇总(pandas 一行,GATE 自动判):
 ```python
 import pandas as pd
-df = pd.read_csv("../../runs/L1_nyu.csv")
+df = pd.read_csv("../runs/L1_nyu.csv")
 g = df.groupby(["arm","K"]).absrel.agg(["mean","std"])
 # Linchpin-1 严谨判据:C 是否在小 K 优于同源后处理 B'
 print(g.loc["C_sample_geo_local"] - g.loc["Bp_postproc_patch_ccf"])   # <0 即 C 赢
@@ -423,8 +423,8 @@ print(g.loc["C_sample_geo_local"] - g.loc["Bp_postproc_patch_ccf"])   # <0 即 C
 ## 附:交付物清单(2026-06-23 更新)
 
 **文档**
-- `docs/experiments/A2_实验方案.md`(本文件:§0–7 决策序列 + §8–14 执行层)
-- `experiments/A2_training_free_single_step_metric/requirements_A2.txt`(GPU 服务器依赖)
+- `docs/02_A2_experiments.md`(本文件:§0–7 决策序列 + §8–14 执行层)
+- `a2/requirements.txt`(GPU 服务器依赖)
 
 **脚本(七个模块 + 一个 driver,全部 `_self_check` 跑通)**
 - `A2_ccf_depth_skeleton.py` — CCF→深度机制核(CCF 可达性 / 时间核退化 / 几何锚局部接地)
@@ -437,8 +437,8 @@ print(g.loc["C_sample_geo_local"] - g.loc["Bp_postproc_patch_ccf"])   # <0 即 C
 - `A2_run_grid.py` — 网格 driver,L0/L1/L2/diag 全 phase 贯通(diag = §4.9 最毒攻击 bias-var)
 
 **GPU 服务器接手清单**(改三处即真跑):
-1. `cd experiments/A2_training_free_single_step_metric && pip install -r requirements_A2.txt` + torch(按 CUDA)
+1. `cd a2 && pip install -r requirements.txt` + torch(按 CUDA)
 2. 下载 `data/nyu/...`(§10 序 1,无注册)
 3. 冒烟:`python A2_run_grid.py --phase L1 --mock`(无 GPU 验证流水线;输出标 `backbone=MOCK`)
-4. 真跑:`python A2_run_grid.py --phase L1 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu --root ../../data/nyu --K 1 2 4 8 --seeds 0 1 2 --out ../../runs/L1_nyu.csv`
+4. 真跑:`python A2_run_grid.py --phase L1 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu --root ../data/nyu --K 1 2 4 8 --seeds 0 1 2 --out ../runs/L1_nyu.csv`
 5. 第 1 周 GATE-1 三连:`--phase L0`(method 新意)+ `--phase diag`(最毒攻击纠偏)+ `--phase L1`(米制),红灯即按 §5 退路矩阵止损

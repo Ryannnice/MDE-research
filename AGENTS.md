@@ -6,9 +6,9 @@ This is a monocular depth estimation research workspace. Write research notes in
 
 ## Layout
 
-- `docs/A2.md`: active A2 research brief and commands.
+- `docs/00_A2.md`: active A2 research brief and commands.
 - `a2/`: active A2 code.
-- `docs/archive/`: old long-form notes and plans. Treat as reference, not the current entry point.
+- `docs/01_A2_idea.md` to `docs/05_MDE_survey.md`: retained long-form notes. Treat as reference, not the current entry point.
 - `papers/`: archived PDFs.
 - `tools/`: helper scripts.
 

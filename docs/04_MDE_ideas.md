@@ -3,7 +3,7 @@
 > 从《Monocular Depth Estimation: A Survey》(IECON 2023)出发的科研扩展构想
 > 初版:2026-06-09 · 最近重构:2026-06-14(按逻辑结构重组 + A①/A② 深度核查)
 > 方法:原论文展望 + 2024–2026 前沿检索 + 证伪式自我批判筛选
-> 配套:`docs/surveys/单目深度估计综述_完整调研报告.md`、`docs/frontier/MDE_前沿深度追踪.md`、`papers/`
+> 配套:`docs/05_MDE_survey.md`、`docs/03_MDE_frontier.md`、`papers/`
 > 演进过程见文末 **§10 修订记录**——本正文只呈现「最新结论」,层累的核查时间线压在 changelog 里。
 
 ---
@@ -188,7 +188,7 @@ ISP is not optimal for depth. We learn a depth-oriented monotonic RAW tone mappi
 
 > **与 A① 的风险类型对比(读这张卡前先看):A① 是执行风险**(方法直觉上就该 work,押在数据/泛化);**A② 是科学风险**——核心机制里藏着两个尚未有人解开的技术张力(§4.4、§4.8),成立则新意比 A① 强(机制级),不成立则塌得更彻底。这张卡刻意把两个张力立成 linchpin,而非包装成顺滑故事。
 >
-> 📖 **先读机制地基**:本卡是决策/立项视角,假定你已懂扩散深度的机制谱系。若要先建直觉,读 `docs/frontier/MDE_前沿深度追踪.md` **B3(扩散深度主线)**:B3.1 范式(Marigold)→ B3.2 提速谱系(E2E-FT/Lotus/DepthFM)→ B3.3 单步内核(ChordEdit/OT/Tweedie)→ B3.4 米制化(GeoDiff/Defocus/AnchorD)→ B3.5 精读路线。可执行实验层见 `docs/experiments/A2_实验方案.md`,机制代码自检见 `experiments/A2_training_free_single_step_metric/A2_ccf_depth_skeleton.py`。
+> 📖 **先读机制地基**:本卡是决策/立项视角,假定你已懂扩散深度的机制谱系。若要先建直觉,读 `docs/03_MDE_frontier.md` **B3(扩散深度主线)**:B3.1 范式(Marigold)→ B3.2 提速谱系(E2E-FT/Lotus/DepthFM)→ B3.3 单步内核(ChordEdit/OT/Tweedie)→ B3.4 米制化(GeoDiff/Defocus/AnchorD)→ B3.5 精读路线。可执行实验层见 `docs/02_A2_experiments.md`,机制代码自检见 `a2/A2_ccf_depth_skeleton.py`。
 
 ### 4.1 判定(CONDITIONAL-GO,经深挖上调可信度)
 
@@ -423,5 +423,5 @@ ChordEdit 单步成立的原理:流匹配轨迹弯曲,单步大跨步误差大;*
 - **2026-06-14 ④重构**:文档由"按时间层累(§8.5/8.7/8.8)"重组为"按逻辑组织(四部分)",消除互相推翻与跳号。
 - **2026-06-15 ⑤A② 立项卡升级**:§4 由"核查粒度"升级到与 §3 对等的"立项卡粒度"。新增:Problem(P1加速/P2米制双子问题)、机制级 core insight(目标端未知的非平凡重定义 + Tweedie 代理锚赌注)、CCF 锚点/目标场重定义的 method 骨架、**双 Linchpin**(L1 采样期注入 vs 后处理标定、L2 单步 vs 多步引导)、按毒性排序的 reviewer 攻击、B1激进/B2稳健两分支。诚实定级:A② 科学风险高于 A①(执行风险),新意则更强(机制级)。
 - **2026-06-15 ⑥八问深挖(go/no-go 均未变,证据加固)**:针对 A①/A② 各 4 问做证据级深挖,下载 6 篇新论文(papers/12 +3、papers/13 +3)。**A①**:① 逆ISP饱和不可逆已量化(Beyond-Metadata:14-bit[16313,16383]→8-bit 255 多对一;Overexposure-Mask-Fusion 专攻过曝逆ISP),写进 §3.7b 作 limitation 弹药而非藏短板;② RAW 域深度专门 sim-to-real 仍空白,RaSim(物理接地仿真)/Focus-on-Defocus(域不变线索)为可借鉴先例(§3.6 补);③ 新最近邻 Dark-ISP(可微 linear+nonlinear ISP,但检测+低光),§3.4/§3.7 加正面区分,"为深度联合优化可微前端"仍空白;④ "深度线索保持 vs 画质"找到视觉科学地基——shape-from-shading 依赖梯度**序结构**、gloss 依赖**幅值+直方图偏度**的 dissociation(§3.7c)。**A②**:① 2026 撞车追踪——Need-for-Speed(单步但要训练+补全)、AnchorD(免训练但需传感器锚+因子图)、Efficient-SID(通用)、ChordEdit 无后续,三角仍空白(§4.5 节4);② Tweedie/x0+OT 平均两零件各有成熟数学基础(Universal-Guidance/NeurIPS24),组合待验,可行性从"全无"升"两零件有据"(§4.4 补);③ **L1 门槛升级**:AnchorD 证明免训练 patch-wise affine 已能保局部结构,对照臂须加 patch-affine 档,不能只跑 2-DOF;**L2 获机制弹药**:CoSIGN 实证 DPS 式梯度引导在 1–2 NFE 失效、改"软约束+投影"可成,正撑 §4.7"烘焙进方向非事后梯度"(§4.8 双 L 补强);④ metric 横比锚点数值入库(Metric3Dv2 KITTI/NYU AbsRel≈0.042、δ1≈0.98)+ 三项协议陷阱(crop/cap/对齐)(§4.10 补)。
-- **2026-06-22 ⑦机制谱系沉到前沿追踪层**:应主攻聚焦需求,把 A② 的扩散深度机制谱系重构进 `docs/frontier/MDE_前沿深度追踪.md` **B3**(B3.1 范式→B3.2 提速→B3.3 单步内核→B3.4 米制→B3.5 精读路线),作为本立项卡的"机制地基"。本卡 §4 标题下加指针指向 B3;综述报告 §9.6、前沿追踪 5 处旧 `8.5` 死链一并修正(原 §8.5 在 ④重构时已并入本 §4)。**内容零新增,纯重组 + 死链修复 + 阅读动线**;go/no-go 不变。
+- **2026-06-22 ⑦机制谱系沉到前沿追踪层**:应主攻聚焦需求,把 A② 的扩散深度机制谱系重构进 `docs/03_MDE_frontier.md` **B3**(B3.1 范式→B3.2 提速→B3.3 单步内核→B3.4 米制→B3.5 精读路线),作为本立项卡的"机制地基"。本卡 §4 标题下加指针指向 B3;综述报告 §9.6、前沿追踪 5 处旧 `8.5` 死链一并修正(原 §8.5 在 ④重构时已并入本 §4)。**内容零新增,纯重组 + 死链修复 + 阅读动线**;go/no-go 不变。
 - **2026-06-22 ⑧精读 ChordEdit/Marigold 全文,两处实质修正(go/no-go 不变)**:① **命名诚实改判(推翻 ⑤/⑥ 及实验方案前述)**——精读证实 **"Chord Control Field (CCF)" 是 ChordEdit 原论文术语**(33 处,p.7 §6.1 定义缩写),非本库提炼词;前述"原论文无 CCF 字样"系误判,已删。真正要标注的是**定义差异**(原=两 prompt drift 平均;A②=指向 Tweedie 锚的位移场平均),写作沿用须引 ChordEdit + 明示重定义,或用 `proxy-anchored CCF`(§4.3 命名澄清)。② **🔴 §4.9 新增最毒攻击维度:有偏锚 vs 零均值噪声**——ChordEdit 时间平均成立的前提是测量噪声 `ε` 零均值(Eq 4.2)→ 纯降方差(附录 D);A② 的 Tweedie 锚是 MMSE **有偏**估计,平均压方差不压偏差,故 ChordEdit 成功**不能外推**,净增益须靠几何锚纠偏或偏差随 t 抵消(§4.4 赌注难点 + §4.9 新行 + 实验方案 §7-4 + 骨架代码注)。另:修复 Marigold 归档 PDF 下载损坏(4.3MB 截断→重下 23MB 完整版)。
