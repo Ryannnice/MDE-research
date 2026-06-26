@@ -1,58 +1,43 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## 仓库性质
 
-这是**单目深度估计(MDE)的科研调研知识库**,不是软件工程项目。核心产出是 4 份长篇中文调研报告 + 94 篇文献 PDF 归档,目标是**支撑一篇 CV 算法顶会(CVPR/ICCV/ECCV/NeurIPS)选题与立项**。代码只有两个工具脚本,不是主体。
+这是单目深度估计科研工作区。当前活跃主线只有 **A2: 免训练 1-2 步扩散米制深度**。新增研究文档默认用简体中文。
 
-全部内容用**简体中文**写作,新增内容也用中文。
+## 当前入口
+
+- `docs/A2.md`: 当前主线短说明。
+- `a2/`: 当前实验代码。
+- `docs/archive/`: 旧长文归档,只作查证材料。
+- `papers/`: 论文 PDF。
 
 ## 命令
 
-只有两个可运行脚本,均为纯标准库 / 轻依赖:
-
 ```bash
-python A2_ccf_depth_skeleton.py   # 跑 A② 机制骨架的逻辑自检(_self_check),无需权重/GPU,秒级
-python rec.py                     # 批量下载 papers/ 缺失的文献 PDF(已存在则 skip)
+cd a2
+python A2_ccf_depth_skeleton.py
+python A2_run_grid.py --phase L1 --mock
 ```
 
-`A2_ccf_depth_skeleton.py` 依赖 `torch`(仅自检用桩函数,不下权重)。改动该文件后务必重跑自检——它验证三件事:CCF 单步可达性、时间核退化、几何锚局部接地。
+改动 A2 代码后重跑:
 
-## 文档体系(三层 + 实验层)
+```bash
+cd a2
+for f in A2_ccf_depth_skeleton A2_geo_anchor A2_eval_protocol \
+         A2_baselines_postproc A2_diag_bias_var A2_marigold_bridge \
+         A2_failure_slices A2_run_grid; do
+  python "$f.py" || exit 1
+done
+```
 
-读懂全局需要理解四份 `.md` 的分工与引用关系:
+## 研究约束
 
-| 文件 | 层级 | 作用 |
-|------|------|------|
-| `单目深度估计综述_完整调研报告.md` | 基础 | 原综述(IECON 2023)逐节通读 + 纠错 + 补「基础模型时代」盲区 |
-| `MDE_前沿深度追踪.md` | 横向铺面 | A0–A9 里程碑方法机制拆解 + B1–B63 前沿专题 + C/D/E/F/G/H 部分 |
-| `可扩展研究方向.md` | 决策/立项卡 | 选题主文档:2 条主攻立项卡(A① HDR/RAW、A② 免训练单步扩散)+ 候选 idea 池 |
-| `A2_实验方案.md` | 执行 | 从 A② 立项卡到可跑实验的工程落地层(配 `A2_ccf_depth_skeleton.py`)|
+- 不伪造实验结果;真实数字必须来自 `runs/*.csv`。
+- A2 claim 只能围绕 L0/L1/L2/diag gates 展开。
+- 必须区分 metric 协议与 affine-invariant 协议。
+- 必须区分 `nfe` 与 `nfe_real`。
+- 不接受需要用户本人自采双目/LiDAR/事件相机数据的 idea;公开数据集可以。
 
-两条主攻方向:**A①** = HDR/RAW 域曝光感知 MDE;**A②** = 免训练单步扩散米制深度。`A2_*` 文件均服务 A②。
+## 文献归档
 
-## 写作约定(改文档前必读)
-
-- **正文只留最新结论;层累的核查过程压进 changelog**。`可扩展研究方向.md` §10「修订记录」、`MDE_前沿深度追踪.md`「更新日志」承载时间线。新增结论时,正文改结论 + changelog 追一条带日期的记录,不要在正文堆叠"先前怎么想、后来推翻"。
-- **差异化用 ★ 评级,且会随核查下调**;严格区分「真空白」与「已有人做、只是没饱和」。把"没饱和"当"真空白"是本库判定的头号坑(见 §0 自我批判原则)。下调评级要在 changelog 留痕(如 A① ★★★★→★★★)。
-- **证据驱动**:关键论断后挂 arXiv/出版方链接或 `papers/` 引用;实验方案按 **cheapest-falsification-first**(先用最便宜的实验杀死 idea)组织,每个 Phase 设 GATE。
-- 日期写绝对值(`2026-06-22`),不写"今天/上周"。
-
-## papers/ 归档约定
-
-94 篇 PDF 按 13 个编号类目(`01_` … `13_`)归档。文件名编号对应文档正文里的引用标记:
-
-- `01_`–`11_`:`[NN] Title.pdf`,`[NN]` 是综述报告 §10 参考文献清单的序号。
-- `12_HDR_RAW_Exposure`:`[HNN] ...`,服务 A①。
-- `13_TrainingFree_SingleStep_Diffusion`:`[DNN] ...`,服务 A②。
-
-文件名常带中文括注点明该文献在论证中的角色(如 `(L1局部结构威胁)`、`(最大撞车)`)。新增文献时沿用此「编号 + 角色括注」命名,并在 `rec.py` 的 `REC` 列表登记下载源(候选 URL 按优先级排列)。
-
-## 硬约束
-
-**选题不接受需用户本人动用深度采集硬件(双目/LiDAR/事件相机)自采数据的 idea**——这是 feasibility 的一票否决项,不是偏好。但使用他人已公开的此类数据集(KITTI、NYUv2、DIODE、Hypersim 等)完全可以。评 idea 可行性时据此判定。
-
-## 杂项
-
-`CLAUDE-FABLE-5.md` 是无关的系统提示词文档,已 gitignore,与本库主题无关,忽略即可。
+`papers/` 按编号类目归档。`13_TrainingFree_SingleStep_Diffusion/` 是 A2 相关论文。下载工具是 `tools/rec.py`。

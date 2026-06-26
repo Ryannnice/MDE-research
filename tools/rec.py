@@ -1,5 +1,6 @@
 import os, re, ssl, urllib.request
-BASE=os.path.dirname(os.path.abspath(__file__)); P=os.path.join(BASE,"papers")
+ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+P=os.path.join(ROOT,"papers")
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36"
 ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE
 def san(n): return re.sub(r'\s+',' ',re.sub(r'[\\/:*?"<>|]','',n)).strip()[:180]

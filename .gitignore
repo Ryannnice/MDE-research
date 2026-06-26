@@ -7,3 +7,9 @@ Thumbs.db
 *.swp
 __pycache__/
 CLAUDE-FABLE-5.md
+
+# 数据集、权重、实验输出和分析产物
+data/
+weights/
+runs/
+analysis/

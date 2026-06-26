@@ -11,14 +11,14 @@ A② 网格 driver —— GPU 服务器执行入口
 
 用法(GPU 服务器):
   # Phase 1 L1:patch-affine 对照 vs 采样期注入,扫 K 阶梯
-  python A2_run_grid.py --phase L1 --backbone e2eft --dataset nyu \\
-      --K 1 2 4 8 16 32 --seeds 0 1 2 --out runs/L1_nyu.csv
+  python A2_run_grid.py --phase L1 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu \\
+      --root ../data/nyu --K 1 2 4 8 16 32 --seeds 0 1 2 --out ../runs/L1_nyu.csv
   # Phase 1 L0:CCF vs 单点 x0 vs 多噪声,三 seed
   python A2_run_grid.py --phase L0 --backbone e2eft --dataset nyu \\
-      --seeds 0 1 2 --out runs/L0_nyu.csv
+      --root ../data/nyu --seeds 0 1 2 --out ../runs/L0_nyu.csv
   # Phase 2 L2:NFE 对齐曲线
-  python A2_run_grid.py --phase L2 --backbone e2eft --dataset nyu \\
-      --nfe 1 2 4 8 --out runs/L2_nyu.csv
+  python A2_run_grid.py --phase L2 --backbone marigold --model_id prs-eth/marigold-depth-v1-1 --dataset nyu \\
+      --root ../data/nyu --nfe 1 2 4 8 --out ../runs/L2_nyu.csv
 
 无 GPU 验证流水线(本地秒级,不下权重):
   python A2_run_grid.py --mock          # 跑全 phase 的合成自检,校验 CSV 完整性

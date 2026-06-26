@@ -1,27 +1,35 @@
-# MDE-research · 单目深度估计调研
+# MDE
 
-围绕综述论文《Monocular Depth Estimation: A Survey》(IECON 2023)展开的深度调研资料库,已扩展为覆盖**整个 MDE 领域 + 2024–2026 前沿追踪 + 科研选题**的三层体系。
+单目深度估计科研工作区。当前只保留一个活跃主线:
 
-> 调研期:2026-06 · 多份长篇报告 · 88 篇文献归档
+- **A2**:免训练 1-2 步扩散米制深度。
 
-## 目录结构
+## 入口
 
-| 文件 / 目录 | 内容 |
-|------|------|
-| [`单目深度估计综述_完整调研报告.md`](单目深度估计综述_完整调研报告.md) | 原综述逐节通读 + 纠错 + 补「基础模型时代」(MiDaS / Depth Anything / Marigold)|
-| [`MDE_前沿深度追踪.md`](MDE_前沿深度追踪.md) | 10 个里程碑方法机制级拆解(A0–A9)+ 63 个前沿专题(B1–B63)|
-| [`可扩展研究方向.md`](可扩展研究方向.md) | 按逻辑组织的选题文档:2 条主攻深度立项卡(A① HDR/RAW 曝光感知、A② 免训练单步扩散米制)+ 3 条候选 idea + 全程核查 changelog |
-| [`papers/`](papers/) | 88 篇参考文献按 13 类归档(新增 12_HDR_RAW_Exposure、13_TrainingFree_SingleStep_Diffusion)|
-| [`rec.py`](rec.py) | 文献批量下载脚本 |
+| 路径 | 作用 |
+|---|---|
+| [`docs/A2.md`](docs/A2.md) | 当前主线的短说明、判据和命令 |
+| [`a2/`](a2/) | A2 实验代码和依赖 |
+| [`docs/archive/`](docs/archive/) | 旧长文、调研、完整实验方案归档 |
+| [`papers/`](papers/) | 论文 PDF |
+| [`tools/`](tools/) | 辅助脚本 |
 
-## 三份报告的关键增量
+## 常用命令
 
-- 补了原综述**缺失的定量对比表**(KITTI Eigen split:DORN → BTS → AdaBins → NeWCRFs)
-- 补全原综述最大盲区:**基础模型时代**与**零样本跨数据集泛化**
-- 核出原论文一处**引用错位**(GASDA [67])
-- 63 个前沿专题铺满 2024–2026 活跃分支:米制深度、视频深度、扩散深度、DUSt3R 点图、VGGT、3DGS、BEV、占用预测、事件相机、水下、遥感等
+```bash
+cd a2
+for f in A2_ccf_depth_skeleton A2_geo_anchor A2_eval_protocol \
+         A2_baselines_postproc A2_diag_bias_var A2_marigold_bridge \
+         A2_failure_slices A2_run_grid; do
+  python "$f.py" || exit 1
+done
+```
 
-## 说明
+依赖:
 
-- 三份 `.md` 报告与 `rec.py` 为本人原创调研成果。
-- `papers/` 下的 PDF 为第三方学术论文,版权归各自作者/出版方所有,**仅供学术研究与个人学习存档**,请通过 arXiv 或各出版方官方渠道获取与引用。
+```bash
+cd a2
+pip install -r requirements.txt
+```
+
+真实实验输出写到项目根目录的 `runs/`，真实数据放 `data/`。这些目录已被 `.gitignore` 忽略。

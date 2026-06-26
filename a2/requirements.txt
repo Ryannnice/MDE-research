@@ -1,6 +1,6 @@
 # A② 免训练单步扩散米制深度 —— GPU 服务器环境
 # 全程纯推理,无训练。单卡 ≥8GB 够跑全部(立项卡 §4.10:算力门槛极低)。
-# 装法:python -m venv .venv && source .venv/bin/activate && pip install -r requirements_A2.txt
+# 装法:python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 #       torch 按服务器 CUDA 版本另装(见下注)。
 
 # --- 核心(骨干 + 机制)---
