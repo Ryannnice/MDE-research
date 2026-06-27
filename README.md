@@ -1,22 +1,31 @@
 # MDE
 
-单目深度估计科研工作区。当前只保留一个活跃主线:
+单目深度估计科研工作区。当前按“代码、选题、文献、论文 PDF”四类资产组织。
 
-- **A2**:免训练 1-2 步扩散米制深度。
-
-## 入口
+## 当前入口
 
 | 路径 | 作用 |
 |---|---|
-| [`docs/00_A2.md`](docs/00_A2.md) | 当前主线的短说明、判据和命令 |
+| [`docs/00_A2.md`](docs/00_A2.md) | A2/I1 当前执行入口:短说明、Gate 和命令 |
 | [`a2/`](a2/) | A2 实验代码和依赖 |
-| [`docs/01_A2_idea.md`](docs/01_A2_idea.md) | A2 idea map |
-| [`docs/02_A2_experiments.md`](docs/02_A2_experiments.md) | A2 长版实验方案 |
-| [`docs/03_MDE_frontier.md`](docs/03_MDE_frontier.md) | MDE 前沿追踪 |
-| [`docs/04_MDE_ideas.md`](docs/04_MDE_ideas.md) | 旧选题池 |
-| [`docs/05_MDE_survey.md`](docs/05_MDE_survey.md) | 综述通读 |
-| [`papers/`](papers/) | 论文 PDF |
+| [`docs/目录.md`](docs/目录.md) | 文档总入口 |
+| [`docs/选题/目录.md`](docs/选题/目录.md) | 当前可推进选题:I1/I2 与备选池 |
+| [`docs/文献调研/目录.md`](docs/文献调研/目录.md) | 综述基础、前沿专题和历史长文归档 |
+| [`papers/README.md`](papers/README.md) | PDF 归档说明,按 G1 三幕组织 |
 | [`tools/`](tools/) | 辅助脚本 |
+
+## 项目结构
+
+```text
+a2/                 A2 代码和 requirements
+docs/
+  00_A2.md          A2 兼容执行入口
+  目录.md           文档总入口
+  选题/             当前 idea、实验路线、归档旧选题
+  文献调研/         综述基础、前沿专题、历史长文归档
+papers/             PDF,按单目深度三幕归档
+tools/              下载/整理辅助脚本
+```
 
 ## 常用命令
 

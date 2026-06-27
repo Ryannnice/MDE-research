@@ -8,8 +8,10 @@
 
 - `docs/00_A2.md`: 当前主线短说明。
 - `a2/`: 当前实验代码。
-- `docs/01_A2_idea.md` 到 `docs/05_MDE_survey.md`: 旧长文,只作查证材料。
-- `papers/`: 论文 PDF。
+- `docs/目录.md`: 文档总入口。
+- `docs/选题/目录.md`: 当前选题入口,I1/I2 与备选池。
+- `docs/文献调研/目录.md`: 文献调研入口,前沿专题与历史长文归档。
+- `papers/README.md`: 论文 PDF 归档入口,按 G1 三幕组织。
 
 ## 命令
 
@@ -40,4 +42,4 @@ done
 
 ## 文献归档
 
-`papers/` 按编号类目归档。`13_TrainingFree_SingleStep_Diffusion/` 是 A2 相关论文。下载工具是 `tools/rec.py`。
+`papers/` 按 G1 三幕归档:专用任务时代、基础模型时代、几何/世界模型时代。A2 相关论文在 `papers/G1_03_几何世界模型时代_2024-2026_前馈可微生成式几何FM_4D几何导出量/01_免训练近单步扩散深度_A2威胁与基线/`。下载工具是 `tools/rec.py`。

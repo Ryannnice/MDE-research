@@ -1,0 +1,427 @@
+# 单目深度估计(MDE)可扩展研究方向
+
+> 从《Monocular Depth Estimation: A Survey》(IECON 2023)出发的科研扩展构想
+> 初版:2026-06-09 · 最近重构:2026-06-14(按逻辑结构重组 + A①/A② 深度核查)
+> 方法:原论文展望 + 2024–2026 前沿检索 + 证伪式自我批判筛选
+> 配套:`docs/05_MDE_survey.md`、`docs/03_MDE_frontier.md`、`papers/`
+> 演进过程见文末 **§10 修订记录**——本正文只呈现「最新结论」,层累的核查时间线压在 changelog 里。
+
+---
+
+## 0. 怎么读这份文档
+
+文档分四部分:
+
+1. **总览与决策**(§1–§2):最新排序 + 选哪个。
+2. **两条主攻深度立项**(§3–§4):HDR/RAW 曝光感知(A①)与免训练单步扩散米制深度(A②),各自自包含,含 problem/insight/method/novelty/evidence/风险全闭环。
+3. **候选 idea 库**(§5–§7):其余基线构想(标定不确定性、恶劣天气、评测基准),作为备选池。
+4. **工具与附录**(§8–§10):活体综述管线、信息来源、修订记录。
+
+> ⚠️ 自我批判原则:全程区分「真空白」与「已有人做、只是没饱和」。差异化强度按 ★(越多越独特)如实标注,且**会随核查下调**——例如 A① 从 ★★★★ 降到 ★★★(见 §10)。把"没饱和"当"真空白"卖是选题最大的坑。
+
+---
+
+# 第一部分 · 总览与决策
+
+## 1. 推荐排序速览(2026-06-14 算法 venue 视角)
+
+目标 venue:**CV 算法顶会(CVPR/ICCV/ECCV;强理论可 NeurIPS),重在新机制/方法贡献,不做部署/真机。** 硬约束:不自采深度硬件,仅用公开 + 合成数据。
+
+| # | 方向 | 差异化 | 判定 | 数据 | 定位 |
+|---|------|--------|------|------|------|
+| **A①** | HDR/RAW 域曝光感知 MDE | ★★★ | emerging 缝,主会无一篇 | 合成现成,真实需逆ISP兜底 | **主攻**(§3)|
+| **A②** | 免训练单步扩散米制深度 | ★★★ | conditional-GO,两面夹击 | 公开零样本基准可横比 | **主攻**(§4)|
+| 3 | 几何先验零样本米制深度 | ★★ | 红海 | 现成 | A② 是其差异化出口 |
+| 2 | 标定不确定性深度基础模型 | ★★ | 去部署后卖点减半 | 现成 | 备选(§5)|
+| 5 | 统一评测 + 失败诊断基准 | ★★ | 社区价值高、非新算法 | 复用本库 | 备选(§7)|
+| 4 | 恶劣天气自监督深度 | ★ | 已拥挤 | — | 不推荐主攻(§6)|
+
+> 注:A① 原标 ★★★★,经证伪式重搜下调到 ★★★(EASD 等零散先例存在,详见 §3.1、§10)。A② 经深挖**上调可信度**——核心新意"推理期 OT 时间平滑迁到稠密深度回归"被确认为完全空白(§4.5)。**两者风险类型不同:A① 执行风险(数据/泛化),A② 科学风险(核心机制两个张力,§4.8),新意更强但更可能塌。**
+
+## 2. 决策建议
+
+- **想要算法新机制 + 抢在主会拥挤前卡位**:**A①(HDR/RAW 曝光感知)**。痛点真实(EASD 摘要逐字印证)、主会尚无人占,但**最大风险是真实数据天花板**(§3.6),须先认下"合成为主 + 逆ISP兜底"的诚实路线。
+- **想要最干净的方法新颖性**:**A②(免训练单步扩散)**。"推理期 OT 时间平滑用于稠密深度"无人做过(§4.3),但**必须把"OT 单步"与"单目几何锚米制"捆绑**才能躲开 E2E-FT 与 GeoDiff 的两面夹击(§4.4)。
+- **想低成本练手**:Idea 5(评测诊断套件,§7),直接复用本库 `papers/` 与 5.3 对比表。
+- **不建议**:Idea 4 当独立主线(§6,已拥挤);A① 把"全网空白"当卖点(已被推翻,§10)。
+
+---
+
+# 第二部分 · 两条主攻(深度立项)
+
+## 3. 主攻 A① — HDR/RAW 域曝光感知单目深度 ★★★
+
+**接原论文哪一句**:综述展望明确指出现有 MDE 默认"图像各区域曝光良好",高动态范围/饱和区域会破坏深度——作者点名却没人系统接的方向。
+
+### 3.1 差异化判定(诚实版)
+
+经证伪式重搜 + 深度核查,**不是"全网空白",而是 emerging / under-explored 的缝**:
+
+| 证据 | 定位 | 是否撞车 |
+|------|------|----------|
+| [EASD(Zhang & Lee, Applied Sci. 2025-08-19)](https://www.mdpi.com/2076-3417/15/16/9130) | 唯一正面命名"Exposure-Aware MDE in HDR",但**冻 SD VAE 抽 sRGB latent**,仍在 8-bit 域 | 最近命名先例;⚠️**MDPI,源策略排除,仅对比定位不作强基线** |
+| StereoRAW(专利) | RAW 域绕 ISP 估深度 | **立体非单目**,且专利非论文 |
+| [Bayer-domain CV(2501.15119)](https://arxiv.org/abs/2501.15119) | RAW Bayer 多任务含深度 | 动机**省算力(−70% FLOPs)**,非 HDR 鲁棒 |
+| CVPR/ECCV/ICCV 2024–25 头部深度 | Depth Anything / Depth Prompting / Depth Any Camera… | **全 RGB 域或传感器融合,无一 HDR/RAW 曝光感知** |
+| 低光 MDE([DepthDark 2507.18243](https://arxiv.org/abs/2507.18243)、[DASP 2512.14536](https://arxiv.org/abs/2512.14536)、[Self-Sup. in Dark IJCAI24](https://www.ijcai.org/proceedings/2024/0173.pdf)) | 暗→欠曝,sRGB 域增强/域适应 | **低光≠过曝,输入域与失效机理不同,互补非撞车** |
+
+→ **卖点须收窄成 EASD/专利/Bayer-CV/低光 MDE 都不占的三元组:`单目前馈(非立体/非多帧) × HDR 曝光几何动机(非省算力/非欠曝) × scene-linear 域两带分治`。**
+
+### 3.2 Problem(信息信道框架)
+
+> 给定单张 RAW / 线性 HDR 辐照图估稠密深度,目标是在 ISP 摧毁深度线索的**过曝/欠曝/强量化区**恢复几何。
+
+钉成**信息信道**问题:几何编码进辐照 `L` → 相机 `I = quant(clip(exp·L) ∘ CRF)` 是一道**深度线索摧毁瓶颈**(clip 多对一、quant 丢位宽);现有 MDE 学 `p(depth | sRGB)` 在瓶颈下游,本工作把估计器移到上游 `p(depth | RAW≈L)`。一句话:**深度线索(shading / texture gradient / defocus)全是辐照的函数,ISP 的 clip+量化发生在几何已编码进光之后,所以回到 RAW/线性域就能拿回 sRGB 扔掉的线索。**
+
+### 3.3 Core insight(两失效带分治 —— 方法脊梁)
+
+| 失效带 | 物理状态 | sRGB | RAW/线性 | 机制 |
+|--------|----------|------|----------|------|
+| **可恢复带** | sRGB 已 clip/量化,但传感器**未到满阱**,RAW 仍有残余梯度 | 线索没了 | **线索还在** | **深度线索保持型可微前端恢复**(主新意,§3.5[A])|
+| **硬截断带** | 传感器级 clip(超满阱)/ 低于噪声底 | 无 | 无 | 饱和置信掩码 + 邻域几何外推(§3.5[C])|
+
+这个分解提前堵死"RAW 里饱和区不也是死的吗":RAW 只救可恢复带;硬截断带建模在**线性域传感器饱和物理**上,与 STEPS 的 LDR 夜间光度域不同。
+
+### 3.4 差异化锚点(审稿必查,正面区分)
+
+| 相邻工作 | 它的域/策略 | 本工作的对立面 |
+|----------|-------------|----------------|
+| [STEPS(2302.01334)](https://arxiv.org/pdf/2302.01334) | LDR 夜间自监督,对过曝区**掩码丢弃(bypass)** | scene-linear 域,对可恢复带**恢复(recover)**,策略相反 |
+| [HDR-NSFF(2603.08313)](https://arxiv.org/pdf/2603.08313) | 多帧→HDR 辐射场**重建**,深度副产物,反用 DA-V2 当先验 | **单图前馈** MDE,深度主输出 |
+| EASD(MDPI) | sRGB latent 曝光鲁棒 | scene-linear 域,主张 sRGB 阶段信息已被 ISP 销毁 |
+| [Dark-ISP(2509.09183)](https://arxiv.org/abs/2509.09183) | 可微 ISP(linear+nonlinear 子模块)task-driven,下游**检测**、域**低光** | 下游**深度**、域**HDR 过曝**;[A] 以"保几何线索的序结构"为显式目标,非检测特征对齐 |
+| [HDR-NSFF 曝光鲁棒消融](https://arxiv.org/pdf/2603.08313) | 把 RGB 转 pseudo-RAW(学习式 ISP 逆)+ ±2EV 评 off-the-shelf 深度器鲁棒性 | 同思路证明"曝光扰深度"成立(可引为动机),但它是**多帧重建 + 测既有模型鲁棒性**,非训练新前馈估计器 |
+
+### 3.5 Method 骨架(机制级)
+
+ISP is not optimal for depth. We learn a depth-oriented monotonic RAW tone mapping and exploit sensor recoverability priors for robust monocular depth estimation under HDR scenes.
+
+```
+单张 RAW(Bayer 10–14bit)/ Hypersim 线性 HDR
+   │
+   ▼ [A] 深度线索保持型可微前端 φθ : L → x̂      ★主新意
+        参数化单调曲线(log/μ-law)或小型单调 MLP,与深度损失端到端联训
+        → 曲线被优化为"保留高光/暗部的深度线索"而非 ISP 的感知观感
+   ▼ [B] 深度基础模型 backbone(Depth Anything V2)
+        起步冻结 + 轻量适配头;消融 frozen / adapter / full-FT,报参数量
+        [A] 的可学习曲线吸收"sRGB 预训练 backbone 吃 linear HDR"的分布漂移
+   ▼ [C] 饱和置信 + 几何外推(只管硬截断带)
+        从 RAW 按"距满阱/距噪声底"算逐像素 recoverability 掩码(传感器物理,非 LDR 光度)
+        → 降权损失 + 门控邻域几何外推
+   ▼ 稠密深度
+```
+
+**fork(护住 monocular 声明)**:主设定 = **单张 RAW**(真单图);多曝光括弧降为消融(动态场景 ghosting + 会被说"那是多帧")。  
+
+即：为了保护（维持）"monocular"（单目/单图）的核心声明，主实验设定采用单张 RAW 输入；多曝光方案仅作为消融实验展示，因为多曝光会引入动态场景 ghosting（重影）问题，而且审稿人可能质疑这已经属于多帧方法，而不是真正的单图方法。
+
+### 3.6 数据策略(三层 —— 这是 go/no-go 命门)
+
+**深度核查结论:真实"可见光 RAW + 稠密深度 GT"公开数据集不存在 → Track 2a 作主实验 NO-GO,必须逆 ISP 兜底。**  
+
+根因是两社区不重叠:RAW 成像集([SID](https://github.com/cchen156/Learning-to-See-in-the-Dark)/ELD/RAW-NOD)无深度;深度集(KITTI/NYU)与带 RAW 的驾驶集(Waymo/nuScenes/PandaSet/[ZOD](https://zod.zenseact.com/))全发 ISP 后 8-bit sRGB。
+
+| 层 | 数据 | 角色 |
+|----|------|------|
+| **主** | [Hypersim(2011.02523)](https://github.com/apple/ml-hypersim):HDR 分层(reflectance/illumination/residual 均 HDR EXR)+ 稠密深度 GT,可造任意曝光线性 HDR 输入 | 训练 + 主评测,**按正常/过曝/欠曝分片** |
+| **兜底** | [Brooks Unprocessing(1811.11127)](https://arxiv.org/abs/1811.11127) / CycleISP 把 KITTI/NYU 等 sRGB 深度集逆推合成 RAW | 扩域;**须诚实讨论"过曝区逆映射不可逆"这一系统局限** |
+| **真实存在性证据** | [ARKitScenes](https://github.com/apple/ARKitScenes)(激光深度但无 RAW/无过曝)+ [ZSLDB / iPhone15Pro(2509.09241)](https://arxiv.org/abs/2509.09241)(唯一真实 RAW+LiDAR 深度,⚠️预印本/小样本) | 小样本定性,堵"全合成"炮火 |
+
+> **2026-06-15 深挖结论(sim-to-real 可借鉴路线)**:RAW 域深度专门的 sim-to-real 工作**仍空白**,但有两类可迁移先例堵"合成→真实域差"炮火:① **物理接地仿真**([RaSim 2404.03962](https://arxiv.org/pdf/2404.03962))按真实传感器成像原理生成高保真深度,免微调直接迁移 —— 对应本工作可把 Hypersim 线性 HDR 经**物理 ISP 正向**(含真实噪声/量化)合成更贴近真机的输入;② **域不变线索**([Focus on Defocus, CVPR2020](https://openaccess.thecvf.com/content_CVPR_2020/papers/Maximov_Focus_on_Defocus_Bridging_the_Synthetic_to_Real_Domain_Gap_CVPR_2020_paper.pdf))证明散焦这类**物理线索**比 RGB 外观更跨域稳健 —— 佐证本工作主张"scene-linear 域的几何线索比 sRGB 外观更域不变"。两者均可写进 §3.9"合成不泛化"的防守。
+
+### 3.7 可微前端的新意定位
+
+可微 ISP / tone-mapping 联合优化已成熟,**但下游几乎全是检测/识别,极少为深度、且以"保几何线索"为显式目标** —— 这是 [A] 组件可主张的细分新意:
+
+| 工作 | 下游 | 与 [A] 的关系 |
+|------|------|---------------|
+| [DynamicISP(ICCV2023)](https://openaccess.thecvf.com/content/ICCV2023/papers/Yoshimura_DynamicISP_Dynamically_Controlled_Image_Signal_Processor_for_Image_Recognition_ICCV_2023_paper.pdf) / [AdaptiveISP(2410.22939)](https://arxiv.org/pdf/2410.22939) | 识别/检测 | 可微 ISP 范式,但非深度 |
+| [Princeton HDR-ISP opt.(ICCP2020)](https://light.princeton.edu/publication/hdr_isp_opt/) | 检测 | 最接近"HDR 输入+可微前端+下游"范式 |
+| [Thermal Chameleon / TCNet(2410.18340)](https://arxiv.org/pdf/2410.18340) | **深度+检测** | **最强差异化锚点**:实证"不同任务该有不同 tone curve",但在热红外域;⚠️预印本 |
+| [Dark-ISP(2509.09183)](https://arxiv.org/abs/2509.09183) | **检测**(低光 Bayer RAW)| **新最近邻**:把 ISP 显式拆成 linear(传感器标定)+ nonlinear(tone-map)可微子模块、task-driven 联训,与 [A]"参数化单调曲线端到端联训"几乎同构 —— **但下游是检测、域是低光,非 HDR 过曝、非深度**;⚠️预印本。强化 [A] 的细分卡位也抬高"为什么深度需要单独做"的举证义务 |
+
+> **2026-06-15 深挖结论(§3.7 补强)**:再搜 2025–26 仍**无人为深度/几何联合优化可微 ISP/tone-map**。最接近的两类:① Dark-ISP/PhyDiISP — 可微 ISP 但下游检测、域低光;② [Robust MDE on Non-Lambertian(2408.06083)](https://arxiv.org/pdf/2408.06083) 在 Hypersim 上用**随机 tone-mapping 增强**训 DA-V2,但 tone-map 是固定增强、非可学习前端,且不分曝光带。→ [A]"可学习单调前端 × 深度损失 × 保几何线索"的三重交叉**仍空白,判定不变**。但 §3.4 须新增 Dark-ISP 作正面区分行。
+
+### 3.7b 数据策略弹药补强(逆 ISP 饱和区不可逆,审稿主攻点)
+
+**2026-06-15 深挖结论(§3.6 兜底层的诚实弹药)**:"逆 ISP 合成 RAW 在过曝区有误差"不再是定性担忧,已有量化证据,且本工作应**主动**在 limitation 章引用,把审稿人的炮弹变成自己的设定边界:
+
+| 证据 | 量化/机制 | 对本工作的用法 |
+|------|-----------|----------------|
+| [Beyond Learned Metadata(2306.12058)](https://arxiv.org/pdf/2306.12058) | 14-bit 线性 RAW 中 [16313,16383] 全被量化到 8-bit 的 255 → 过曝区**多对一不可逆**,信息损失非均匀分布(过曝区 ≫ 正常区)| 直接量化"clip+quant 的信道瓶颈"(§3.2),坐实 Track2b 逆ISP兜底的系统上界 |
+| [Overexposure Mask Fusion / Reverse-ISP(2210.11511)](https://arxiv.org/pdf/2210.11511) | 专攻过曝区 reverse-ISP 多步精修,实证过曝区是 RAW 重建误差主来源 | 兜底数据生成时**对过曝区单独建掩码/降权**的方法先例,而非全图均匀逆推 |
+| [InvISP(2103.15061)](https://arxiv.org/pdf/2103.15061) | 可逆 ISP 能近完美回 RAW,但论文自承 clip/quant 处保真度受限 | 区分:本工作合成端可选 InvISP 式可逆前向以**减小**(非消除)饱和误差 |
+| 经典 highlight-recovery(跨通道) | 仅当≥1 通道未饱和可部分恢复;大面积全饱和区色相普遍错 | 对应 §3.3"硬截断带":全通道饱和=真死,只能掩码外推,不能假装可逆 |
+
+→ **写作策略**:不藏短板。Track1 主证据全在 Hypersim **真线性 HDR**(无逆ISP误差),逆ISP 仅用于 Track2b 扩域,且 limitation 明列"过曝全饱和区合成 RAW 不可信→该区只做掩码不做恢复评测"。这把"合成不可信"从 requires-new-result 降级为 design-fixable。
+
+### 3.7c 深度线索保持 vs 感知画质:理论支撑(§3.3 的视觉科学地基)
+
+**2026-06-15 深挖结论**:核心 insight"曲线该保深度线索而非感知观感"有**视觉科学实证地基**,可写进 intro 抬升立意而非仅工程直觉:
+
+- **关键 dissociation(可引用)**:shape-from-shading 依赖亮度梯度的**序结构(ordinal structure)**,而光泽/材质感知依赖梯度**幅值 + 亮度直方图偏度(skew)**——两者依赖独立图像特征([PLOS CB 2014 specular convexity](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003576)、[JOV gloss/highlight 系列](https://jov.arvojournals.org/article.aspx?articleid=2752942))。
+- **推论**:clip/饱和**先摧毁高光幅值与直方图偏度(材质/感知画质)**,而 shape-from-shading 所依赖的梯度序在可恢复带相对更顽强 —— 正是 [A] 该优化的目标(保序、保暗部/高光残余梯度),与 ISP 追求的感知观感(幅值、对比、观感亮度)**目标正交**。
+- **边界诚实**:specular highlight 对形状感知的作用文献本身有争议(部分研究显示无效),且高光主要起**凸性消歧**作用;故本工作主张"保序"而非"保高光绝对值",定级为 under-explored 的合理假设,Linchpin(§3.8 增强追不平)仍是最终裁决。
+
+### 3.8 Novelty + Evidence + Linchpin
+
+**Novelty(去水分)**:① 设定 — 首个 scene-linear 域**单图前馈** MDE + 曝光作为深度线索摧毁因子显式建模;② 方法 — 深度线索保持型可微前端 + 两带分治(与 STEPS"掩码丢弃"相反);③ 基准 — 可控 ISP 模拟 + 曝光分片鲁棒性基准。**诚实定级:扎实的"新设定+简洁方法+干净基准",非范式突破。**
+
+**Evidence plan**:
+- Track 1(主证据,无门槛):Hypersim → 可微 ISP 模拟生成 (sRGB, RAW/HDR, depth) → depth-from-RAW vs depth-from-LDR,**按曝光分片**报 AbsRel/δ1;头条 = 过曝/欠曝片增益且正常片不退化。
+- Track 2(真实,最高风险):2a 真实 RAW+深度 NO-GO→ 2b 真实 sRGB 基准切自然过曝/欠曝片验迁移 + ZSLDB/ARKitScenes 定性。
+
+**Linchpin 消融(决定生死)**:`sRGB+曝光增强` 必须**追不平** `RAW+可学习前端`,否则整个 setting 立不住。配 frozen/adapter/full-FT 报参数量。
+
+### 3.9 Reviewer 风险
+
+| 攻击 | 类型 | 防守 |
+|------|------|------|
+| **合成 only,真实不泛化** | requires-new-result | **最高风险**。Track 2b 真实分片 + ZSLDB 定性;limitation 章正面认逆ISP不可逆 |
+| 这就是数据增强/域适配 | evidence-fixable | §3.8 linchpin:增强追不平,只有 linear 域闭合 |
+| 撞 STEPS / EASD | writing-fixable | §3.4:域不同 + recover vs discard;EASD 在排除 venue |
+| 测试时拿不到 RAW | design-fixable | 单 RAW 手机普及;提供 sRGB 输入变体;基准本身即贡献 |
+
+---
+
+## 4. 主攻 A② — 免训练单步扩散米制深度 ★★★
+
+> **与 A① 的风险类型对比(读这张卡前先看):A① 是执行风险**(方法直觉上就该 work,押在数据/泛化);**A② 是科学风险**——核心机制里藏着两个尚未有人解开的技术张力(§4.4、§4.8),成立则新意比 A① 强(机制级),不成立则塌得更彻底。这张卡刻意把两个张力立成 linchpin,而非包装成顺滑故事。
+>
+> 📖 **先读机制地基**:本卡是决策/立项视角,假定你已懂扩散深度的机制谱系。若要先建直觉,读 `docs/03_MDE_frontier.md` **B3(扩散深度主线)**:B3.1 范式(Marigold)→ B3.2 提速谱系(E2E-FT/Lotus/DepthFM)→ B3.3 单步内核(ChordEdit/OT/Tweedie)→ B3.4 米制化(GeoDiff/Defocus/AnchorD)→ B3.5 精读路线。可执行实验层见 `docs/02_A2_experiments.md`,机制代码自检见 `a2/A2_ccf_depth_skeleton.py`。
+
+### 4.1 判定(CONDITIONAL-GO,经深挖上调可信度)
+
+三角"免训练 ∧ 单步 ∧ 扩散深度"**仍空白**,且其中**最干净的一块新意**——"把 ChordEdit 式推理期 OT 时间平滑迁到稠密深度回归"——经穷尽搜索**无人占**(§4.5 节2)。但有两道窄缝必须在写作里正面拆掉(§4.6)。**结论:能做,但 novelty 必须捆绑,不能单卖任何一条;科学风险高于 A①,已如实定级。**
+
+### 4.2 Problem(两个被分别解决、却从未免训练合并的子问题)
+
+> 给定预训练扩散/流匹配深度骨干(Marigold 路线),**不动任何权重**,仅在推理期把多步采样塌缩到 1–2 步,并同时输出**米制**深度。
+
+- **P1 加速**:多步扩散深度慢(Marigold 50 步×10 ensemble)。现有单步解**全部要训练/蒸馏**(E2E-FT、Lotus、DepthFM)。
+- **P2 米制**:扩散深度骨干输出 affine-invariant 相对深度,无绝对尺度。现有**免训练**米制解(GeoDiff)**要立体**。
+
+A② 主张:**P1 与 P2 可用同一个推理期机制(OT 时间平滑构造的和弦控制场 CCF)一并解决,全程免训练、单目。**
+
+### 4.3 灵感源:ChordEdit 机制拆解([2602.19083](https://arxiv.org/abs/2602.19083), CVPR 2026 Oral)
+
+单步图像编辑。扩散/流匹配里原图→编辑图的传输轨迹高度弯曲、高能量;单步大跨步积分会放大方向误差致崩坏。它用**最优传输(OT)**思想,在**去噪时间窗口内对观测代理场加权平均(时间平滑)**,把高能瞬时漂移场收缩成平直低能的"**和弦控制场(Chord Control Field, CCF)**"实现单步。三要件:① 和弦控制场;② 统一映射系数(噪声/速度预测都投影到统一虚拟速度场,**与骨干无关**);③ 可选近端细化(NFE 1→2)。**免训练、免反演**,7GB / 0.2s。
+
+> ⚠️ **命名澄清(2026-06-22 精读全文,推翻早先误判)**:"Chord Control Field (CCF)" **是 ChordEdit 原论文术语**(全文 33 处,p.7 §6.1 正式定义缩写),非本库提炼词——**可放心沿用并引用**。但原文 CCF 的定义是"**两 prompt drift `Δv` 的时间加权平均**";A② 把它**重定义**为"指向 Tweedie 代理锚的位移场平均"(§4.4),机制结构不同。写作沿用 CCF 名时须引 ChordEdit + 明示"重定义到深度条件生成",或起区分名 `proxy-anchored CCF`,避免被指模糊借势。
+
+> ⚠️ 钉死澄清:ChordEdit 的"时间"是**去噪步**,不是视频帧。可迁移内核 = **面对生成空间剧烈波动的向量场,不加步数不训新网,在去噪时间维做局部平滑把弯曲轨迹塌缩成单步低能直线** —— MDE 里对应 Marigold 路线的扩散深度。
+
+### 4.4 Core insight(机制级 —— 含一个非平凡重定义)
+
+ChordEdit 单步成立的原理:流匹配轨迹弯曲,单步大跨步误差大;**OT 位移插值是直线(恒速)**,故若把弯曲瞬时速度场在去噪时间窗内**加权平均成逼近 OT 直线位移的等效恒速场**(CCF),沿它单步走就准。时间平滑 = 在估计这条等效直线的方向。
+
+**迁到深度条件生成,有一个非平凡的重定义(真技术点,非口号):**
+
+| 维度 | ChordEdit(编辑) | 深度条件生成(本工作) |
+|------|------------------|------------------------|
+| 源端锚 | 原图 latent `x_src`(已知) | 高斯噪声 `z_T`(已知) |
+| 目标端锚 | 编辑图 latent `x_tgt`(可估) | **条件深度后验 `p(d\|I)` 的样本 `d₀`(未知,正是要求的)** |
+
+→ **核心难点暴露**:编辑两端都可锚定,深度生成的目标端恰是未知量,**CCF 指向目标端的"直线方向"无法直接算**。
+→ **机制赌注(needs-mechanism,诚实标为假设)**:用骨干自身单步 Tweedie/x0-prediction 先出**目标代理锚 `d̂₀`**,在时间窗内对"指向 `d̂₀` 的速度场族"做 OT 加权平均构造 CCF。差异化必须落在:CCF 用**多时间点速度场的 OT 低能平均**修正单点 x0 的偏差,且**几何锚把 `d̂₀` 从相对解拉向米制解**——这是 x0 预测本身没有的(能否实证拉开 = §4.8 Linchpin)。
+
+> **2026-06-15 数学可行性核查(撑机制赌注)**:"用 Tweedie/x0 代理锚 + 多时间点速度场 OT 平均"的两块零件**各自均有成熟数学基础**:① **Tweedie/x0 代理**是 training-free guidance 的标准做法——用 Tweedie 公式取 `x̂₀` 的 MMSE 估计,再在干净图上施加可微 loss 引导后验 `p(x₀|y) ∝ p(x₀)exp(−L)`([Universal Guidance](https://www.emergentmind.com/topics/universal-guidance-algorithm-for-diffusion-models)、[Understanding Training-free Guidance NeurIPS24](https://proceedings.neurips.cc/paper_files/paper/2024/file/c4edc5113b4ffd4632718558fb66b9ef-Paper-Conference.pdf)、[Spherical Gaussian Constraint 2402.03201](https://arxiv.org/pdf/2402.03201))。② **OT 位移插值=恒速直线**是 ChordEdit CCF 的理论核(time-weighted drift 平均)。**真正未被验证的不是任一零件,而是"在去噪时间窗对指向同一未知 `d̂₀` 的速度场族做 OT 平均能否净修正单点 x0 偏差"这一组合**——这就是 §4.9 最毒攻击("OT 平滑只是装饰")要消融的。**诚实结论:可行性证据从"全无"升到"两零件有据、组合待验",但核心赌注未消除。**
+>
+> **🔴 赌注的精确难点(2026-06-22 精读 ChordEdit 补)**:ChordEdit 的时间平均之所以成立,前提是它平滑的对象 `R=u_t+ε` 中 **ε 零均值**(原文 Eq 4.2),平均纯降方差。A② 的 `d̂₀` 是 **MMSE 有偏锚**,误差非零均值——**时间平均压方差却压不掉偏差**。故 ChordEdit 的成功(Fig.9)**不能直接外推**到深度;A② 的净增益必须来自"几何锚纠偏"或"偏差随 t 变化被多时间点抵消",这正是 §4.9 新增最毒攻击维度的要害。
+
+### 4.5 三道核查(每道带证据)
+
+**节1 — "免训练∧单步∧深度"是否空白?** 仍空白。2024–26 所有"单步扩散深度"无一例外靠训练:
+
+| 工作 | venue | 要训练? | 定位 |
+|------|-------|---------|------|
+| [E2E-FT(2409.11355)](https://arxiv.org/abs/2409.11355) | arXiv | 含免训练单步 + 之后 E2E 微调 | **最大撞车**:trailing-timestep 修正使未微调 Marigold 单步即≈SOTA、200×,但仅当 baseline 顺手报告,无 OT 无几何锚 |
+| [Lotus(2409.18124)](https://arxiv.org/abs/2409.18124) / [GeoWizard(2403.12013)](https://arxiv.org/abs/2403.12013) | arXiv/ECCV24 | 要训练 | 训练派对照 |
+| [DepthFM(2403.13788)](https://arxiv.org/html/2403.13788v1) | AAAI25 | 要训练(OT 在**训练期**)| 区分点:本 idea 把 OT 移到**推理期** |
+| [FE2E(2509.04338)](https://arxiv.org/html/2509.04338v1) | arXiv | 要训练(LoRA 改 FM loss)| 反衬本 idea 免训练定位 |
+
+**节2 — OT 时间平滑迁到稠密回归?** **完全空白 = 最干净新意。** 没人把 ChordEdit 式"推理期 OT 时间平滑/轨迹塌缩"用到深度/法向/光流。最接近的免训练轨迹加速 [ETC(2510.24129)](https://arxiv.org/abs/2510.24129) 用趋势外推非 OT、且通用生成;所有 OT 直化([OFM NeurIPS24](https://arxiv.org/pdf/2403.13117)、OT-NFM、DepthFM)都在训练期。
+
+**节3 — 几何尺度锚注入采样(相对→米制)?** 有缝但收窄:
+
+| 工作 | 要训练? | 定位 |
+|------|---------|------|
+| [GeoDiff / Geometry-Guided Diffusion(2510.18291)](https://arxiv.org/pdf/2510.18291) | **免训练**(采样期梯度引导 scale/shift)| **最近撞车**,但**需立体/双视图**,非单目几何锚 → 缝在锚源 |
+| [Defocus-cue Repurpose Marigold(2505.17358)](https://arxiv.org/pdf/2505.17358) | **免训练**(推理期注入散焦线索→米制)| **强先例**:同思路,但锚是散焦非几何尺寸 → 强可比参照 |
+| [GRIN(2409.09896)](https://arxiv.org/abs/2409.09896) / [DMD(2312.13252)](https://arxiv.org/pdf/2312.13252) | 要训练(尺度学进权重)| 单目米制基线,不撞免训练 |
+
+**节4 — 2026 上半年撞车追踪(新增)**:再扫一轮,三角"免训练 ∧ 单步 ∧ 单目"**仍空白,go/no-go 不变**;新出现的近邻均在某一维掉出三角:
+
+| 新工作(2026) | 落点 | 是否撞车 | 判定 |
+|------|------|----------|------|
+| [Need for Speed / Marigold-SSD(2603.10584)](https://arxiv.org/abs/2603.10584) | 单步,但**要微调**(4.5 GPU-day)+ **深度补全**(需稀疏深度输入) | 否 | 掉出"免训练"且非纯单目 → 反衬本 idea 免训练定位;但须在 related work 正面区分"单步≠免训练" |
+| [AnchorD(2605.02667)](https://arxiv.org/abs/2605.02667) | **免训练 + patch-wise affine + 保局部结构**,但用**因子图**(非扩散采样)且**需原始传感器深度锚** | 否(非纯单目、非扩散)| **却抬高 Linchpin-1 的举证门槛**:它证明"免训练后处理也能做到保局部结构的米制接地",本工作"采样期注入 > 后处理"必须赢的不再是 2-DOF 全局拟合,而是 AnchorD 式 patch-wise 局部对齐(见 §4.8 L1 升级) |
+| [Efficient & Training-Free Single-Image Diffusion(2606.04299, CVPR2026 highlight)](https://arxiv.org/abs/2606.04299) | 免训练单步,但**通用生成**非深度、无几何锚 | 否 | 通用加速派,不占深度+米制三角 |
+| [ChordEdit(2602.19083)](https://arxiv.org/abs/2602.19083) | 灵感源本体,CVPR2026 Oral + Best Student Paper HM | — | 经查**无后续/无迁到非编辑任务**(截至 v2 2026-03);"OT 时间平滑迁稠密回归"仍由本 idea 独占(§4.5 节2 不变) |
+
+### 4.6 两面夹击与捆绑差异化
+
+```
+        E2E-FT(免训练单步,但只修调度器,无 OT 无锚)
+              ╲
+本 idea ──── 必须同时是:① 推理期 OT 时间平滑迁到深度(节2 空白,最干净)
+              ╱                ② 单目几何锚米制(区别 GeoDiff 立体锚、散焦锚)
+        GeoDiff(免训练几何引导米制,但需立体)
+```
+
+→ **只做①(OT 塌缩到单步)会被 E2E-FT + ChordEdit 夹击;只做②(几何锚米制)会被 GeoDiff 夹击。两者必须捆绑成"免训练单步米制端到端管线"才稳。** 强先例 Defocus-Marigold 证明"免训练推理期注入物理线索→米制"路线可行,本工作把锚从散焦换成几何尺寸/地平面/内参,且收到单步。
+
+### 4.7 Method 骨架(CCF 的锚点/目标场如何重定义)
+
+```
+单图 I → 冻结 Marigold/流匹配深度骨干(全程不微调)
+   │
+   ▼ [Tweedie 代理] 单步 x0-prediction 出目标代理锚 d̂₀(解决"目标端未知")
+   │
+   ▼ [A] 和弦控制场 CCF:去噪时间窗 {t_k} 采若干速度场 v(z_{t_k}, t_k | I),
+        OT 加权平均成逼近"z_T → d̂₀"直线位移的等效恒速场 → 单步大跨步积分
+        · 目标场重定义 = 噪声 →(条件于 I 且符合几何锚的)米制深度后验
+   │
+   ▼ [B] 单目几何锚能量项 E_geo 烘焙进 CCF 加权(非事后梯度引导):
+        已知物体尺寸(车牌/A4/瞳距 63mm)/ 地平面 / 内参 EXIF → 软约束
+        · 关键:E_geo 改变 CCF 的"等效直线方向",一次性修正单步方向
+   │
+   ▼ [统一映射系数] 噪声/速度预测骨干都投影到统一虚拟速度场 → 骨干无关、即插
+   │
+   ▼ 单步米制深度
+```
+
+**最危险的内在张力(needs-mechanism,须在 intro 就承认):几何能量引导天然要多步**(classifier/energy guidance 靠迭代回推梯度),**而本工作要单步**——单步没有迭代空间做引导。解法是把 `E_geo` **烘焙进 CCF 的方向构造**(改直线方向)而非事后梯度下降。**这条能否成立是 idea 的核心科学赌注**:成 → 机制级新颖;不成 → "单步"与"几何锚"二选一、捆绑散架(= §4.8 Linchpin-2)。
+
+### 4.8 Linchpin 消融(两个,任一失败 idea 即塌)
+
+**Linchpin-1(米制的生死):采样期几何锚注入 必须 > 后处理几何标定。**
+- 对照臂:`Marigold 相对深度 → 几何锚最小二乘拟合全局 scale+shift`(纯后处理,2 自由度)。
+- 若后处理就追平 metric 精度 → "采样期注入"是花架子,degrade 成 ZoeDepth 式后处理。采样期想赢必须靠几何锚在去噪中**修正局部深度结构**(如地平面约束纠正地面倾斜),不止全局缩放。
+- **守的是 GeoDiff 那侧**:米制不是后处理能做的。
+- **⚠️ 2026-06-15 门槛升级(AnchorD 2605.02667)**:对照臂**不能只放 2-DOF 全局拟合**。AnchorD 证明免训练后处理已能做 **patch-wise affine 局部接地 + 保几何结构/不连续**。故 L1 对照臂须升级为**两档**:(a) 全局 scale+shift;(b) **patch-wise/分段 affine**(AnchorD 式)。采样期注入必须赢 (b) 才算真贡献——否则审稿人会问"为何不后处理 patch-affine"。**注意 AnchorD 需传感器深度锚,本工作几何锚是无传感器的(物体尺寸/地平面/内参),这是可主张的差异,但精度上限之争仍在 (b)。**
+
+**Linchpin-2(单步的生死):单步注入几何锚 必须 ≈ 多步引导质量。**
+- 对照臂:多步 energy guidance(慢但准)vs 本工作单步烘焙 CCF。
+- 若单步几何锚显著劣于多步 → §4.7 "烘焙进方向"假设不成立,"单步"与"几何锚"无法兼得,捆绑散架。
+- **守的是 E2E-FT 那侧**:单步不是只修调度器、能扛引导。
+- **✅ 2026-06-15 机制弹药(CoSIGN 2407.12676, ECCV24)**:此张力**有文献正面背书且有解法范式**。CoSIGN 实证 **DPS 式逐步梯度引导在 1–2 NFE 区直接失效**,但通过**把约束改成"软约束(ControlNet 式直接注入)+ 投影/硬约束"而非迭代梯度**,成功在 1–2 步注入测量约束。→ 这正是 §4.7"烘焙进方向而非事后梯度下降"的可行性先例:**单步注入约束的正确姿势是改轨迹/投影,不是迭代回推梯度**。配套 [ReCFG(2410.18737)](https://arxiv.org/pdf/2410.18737)(闭式、非迭代、无额外推理开销)与 [Projected Diffusion(2402.03559)](https://arxiv.org/pdf/2402.03559)(约束需投影保可行性,纯梯度不保证)共同撑起 L2 的"能成"一侧。**但都不是深度+几何锚,故仍是赌注非定论。**
+
+> 建议立项**第一周先跑 Linchpin-1 的后处理对照**——最便宜、最可能一票证伪整个 idea。**且对照臂直接上 patch-wise affine 档(AnchorD 式),别只跑全局 2-DOF。**
+
+### 4.9 Reviewer 风险(按毒性排序)
+
+| 攻击 | 类型 | 防守 |
+|------|------|------|
+| **「CCF 目标锚不就是 x0 预测?OT 平滑只是装饰」** | requires-new-result | **最毒**。消融 CCF vs 纯 x0 vs 单点速度,证明多时间点 OT 平均的净增益;否则承认退化为 E2E-FT |
+| **🔴「Tweedie 锚有偏,时间平均压方差≠纠偏,ChordEdit 成功不可外推」** | requires-new-result | **最毒的更深一层(2026-06-22 精读 ChordEdit §3.2/4.1 新增)**。ChordEdit 测量模型 `R=u_t+ε` 的 **ε 严格零均值**(Eq 4.2),其时间平均是 Jensen-L² 降方差(附录 D);而 Tweedie `d̂₀` 是 **MMSE 有偏估计**,误差非零均值——**平均压方差、压不掉偏差**。故不能拿 ChordEdit Fig.9 当背书。防守:正面实证 **几何锚纠这个偏**,或 **偏差随 t 变化使多时间点可抵消**;消融须含"有偏单点 x0 vs CCF"的纠偏量,而非只比方差 |
+| **「采样期几何锚 = 后处理 scale/shift 拟合,不必动采样」** | requires-new-result | Linchpin-1:实证采样期修正**局部结构**,后处理只能全局 |
+| **「单步与几何引导本质冲突,两卖点不能同真」** | design-fixable→evidence | Linchpin-2:给 NFE 对齐下单步≈多步曲线;退路主打 1–2 步而非严格 1 步 |
+| 「E2E-FT 已有免训练单步」 | writing-fixable | 它只修调度器、无 OT、无米制;本 idea 是机制 + 米制端到端 |
+| 「GeoDiff 已有免训练几何米制」 | writing-fixable | 它需立体;本 idea 单目 + 单步 |
+| 「假米制(其实 affine 对齐)」 | design-fixable | 进 **metric 协议**(不对齐)横比 UniDepth/Metric3D v2/Depth Pro |
+
+### 4.10 Novelty + Evidence + 评测协议
+
+**Novelty(去水分)**:① method — 首个推理期 OT 时间平滑用于稠密深度回归(节2 空白);② synthesis — 免训练 ∧ 单步 ∧ 单目几何锚米制 端到端管线;③ empirical — 免训练 1–2 步逼近/超越训练派单步。**诚实定级:机制迁移 + 组合创新,押注全在 §4.4/§4.7 两个张力能否做扎实。**
+
+**Evidence**:骨干 = Marigold(主)+ 一个流匹配深度骨干(证骨干无关);**纯推理零训练,算力门槛极低**,契合硬约束。
+
+**评测协议(必须卡死)**:**最致命二分 = affine-invariant(对齐 scale+shift,Marigold/DepthFM 走)vs metric(直接出米不对齐,UniDepth/Metric3D 走)。** 本 idea 主打几何锚→米制,**必须进 metric 协议**,否则被指"假米制"。
+- 基线:[UniDepth(2403.18913)](https://arxiv.org/pdf/2403.18913)、[Metric3D v2(2404.15506)](https://arxiv.org/pdf/2404.15506)、[Depth Pro(2410.02073)](https://arxiv.org/pdf/2410.02073)、ZoeDepth;另比训练派单步(E2E-FT/Lotus)、免训练多步(Marigold/Marigold-DC)、免训练几何米制(GeoDiff/Defocus-Marigold)。
+- 基准:NYUv2 / KITTI(Eigen split, Garg crop, 80m)/ ETH3D / ScanNet / DIODE。
+- 指标:米制 AbsRel、δ1/δ2/δ3、RMS、log10;另报 NFE 与墙钟时间(单步卖点硬证据)。
+
+**2026-06-15 横比锚点数值(供对齐,真零样本 metric、不对齐)**:
+- **Metric3D v2**(ViT-L)零样本 metric:KITTI **AbsRel 0.042 / δ1 0.979**;NYUv2 **AbsRel 0.042 / δ1 0.980**(ViT-g 略同档)([2404.15506](https://arxiv.org/pdf/2404.15506))。
+- **UniDepth**:δ1 在 NYU 较 Metric3D/ZeroDepth 提升约 5.8% / 7.3%,KITTI 约 1.1% / 9.4%;跨域(Sun-RGBD)AbsRel ~0.087 优于 Metric3D v2(0.156)与 Depth Pro([2403.18913](https://arxiv.org/pdf/2403.18913))。
+- **协议陷阱(必须在表注写清)**:(1) KITTI 表里"前 N 行 in-domain 训练、后几行零样本"混排——横比只能取**同一 regime**;(2) Eigen split + **Garg crop** + cap 80m 是 KITTI metric 惯例,NYU 用官方 crop;(3) **metric 协议 = 不做 median/affine 对齐**,与 Marigold/DepthFM 的 affine-invariant 表**不可同表**,本 idea 必须自报"零对齐"列,否则即被指假米制。ETH3D/ScanNet/DIODE 多数论文按各自零样本协议报,数值分散,**横比前须逐篇核 crop/cap/对齐三项再入表**(沿用 Idea 5 §7 的诊断切片纪律)。
+
+### 4.11 两个 concretization 分支(供决策)
+
+| 分支 | 内容 | 风险/回报 |
+|------|------|-----------|
+| **B1 激进单步** | 严格 1-NFE + 几何锚烘焙 CCF | Linchpin-2 全压;成则最惊艳,败则散架 |
+| **B2 稳健 1–2 步** | 1 步加速 + 1 步几何近端细化(ChordEdit NFE 1→2)| 给几何引导留 1 步空间,L2 风险骤降;"单步"退为"近单步",新意略减但稳 |
+
+> 建议:**先按 B2 立项跑通,拿 L1/L2 信号后再决定能否收紧到 B1。** B1 当冲刺目标,不当立项前提。
+
+---
+
+# 第三部分 · 候选 idea 库(基线池)
+
+> Idea 1 已深化为 **§3 主攻 A①**;Idea 3(几何先验零样本米制)的差异化出口已并入 **§4 主攻 A②**。此处保留其余三条作备选。
+
+## 5. Idea 2 — 标定不确定性的深度基础模型 ★★
+
+**空白依据**:[UQ×基础模型综述(2501.08188)](https://arxiv.org/html/2501.08188v1)把它列为开放问题。基础模型给相对深度 + 无标定不确定性,而安全应用要"米制深度 + 我有多确信"。
+
+**核心想法**:冻结 Depth Anything 骨干 + 轻量证据回归头,一次前向同时输出深度 + 标定逐像素方差;用 sparsification error、ECE 评标定质量。
+
+**诚实评估**:**去掉机器人部署后卖点减半**(原"闭环碰撞率"那半没了)。UQ 方法本身不新,胜负手本在闭环证据;纯算法 venue 下需重新找"标定本身的算法新意"(如单步扩散如何不丢采样型不确定性——可与 A② 联动)。
+
+## 6. Idea 4 — 恶劣天气自监督深度(不推荐主攻)★
+
+**为什么下调**:原作者押注且 [PhysDepth](https://arxiv.org/html/2412.04666v2)、[Depth-Centric Dehazing](https://arxiv.org/html/2412.11395)、[Effective-Rank 天气泛化(2509.00665)](https://arxiv.org/html/2509.00665)、[多模态恶劣天气数据集(2411.11455)](https://arxiv.org/html/2411.11455)已密集在做。**差异化最弱。**
+
+**若仍要做**:瓶颈在恶劣天气**没有 GT**。可做晴天→雨雾的物理可微退化(大气散射 ASM)数据增强 + 晴/恶劣成对帧自监督一致性。宜作 A① 的姊妹/消融对照,非独立主线。
+
+## 7. Idea 5 — 统一评测协议 + 失败模式诊断基准 ★★
+
+**空白依据**:[How to Evaluate MDE?(2510.19814)](https://arxiv.org/html/2510.19814v1)把"MDE 怎么评测"列为开放问题——crop/cap/median-scaling 各家不一(本库 5.3 反复强调的不可比性)。
+
+**核心想法**:标准化评测 + 失败模式诊断套件,按**透明/反光/动态物体/过曝欠曝/远距离**切片分别报告(而非只给平均 AbsRel)。
+
+**诚实评估**:贡献是"整理与标准化"非新方法,"重算法"诉求下偏弱;但投入产出比高、引用潜力高,适合低成本起步,且能复用本库资料。**与 A① 天然联动**(过曝/欠曝切片正是 A① 的主战场)。
+
+---
+
+# 第四部分 · 工具与附录
+
+## 8. 工具(非科研贡献):AI-agent 驱动的 MDE 活体综述管线
+
+本仓库"PDF → 调研报告 → 分类归档 → 纠错 → 补基础模型时代"流程本身是可复用的科研 agent 管线。可产品化为:定时抓 arXiv 新 MDE → 自动归类到现有 11+1 分类 → 抽取 KITTI/NYU 数值填进 5.3 对比表 → 与已有结论冲突时告警。把 2023 静态综述变成**自更新活体综述**。定位:工程工具,非科研创新,但能持续为上述任一 idea 供给文献情报。
+
+## 9. 信息来源
+
+**A① HDR/RAW 曝光感知(§3)**
+- 命名先例/相邻:[EASD MDPI2025](https://www.mdpi.com/2076-3417/15/16/9130)(⚠️排除venue)、[HDR-NSFF 2603.08313](https://arxiv.org/pdf/2603.08313)、[STEPS 2302.01334](https://arxiv.org/pdf/2302.01334)、[红外 RAW MDE PMC12251710](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12251710/)
+- 低光 MDE(相邻非撞):[DepthDark 2507.18243](https://arxiv.org/abs/2507.18243)、[DASP 2512.14536](https://arxiv.org/abs/2512.14536)、[Self-Sup. in Dark IJCAI24](https://www.ijcai.org/proceedings/2024/0173.pdf)
+- 数据:[Hypersim 2011.02523](https://github.com/apple/ml-hypersim)、[Brooks Unprocessing 1811.11127](https://arxiv.org/abs/1811.11127)、[ARKitScenes](https://github.com/apple/ARKitScenes)、[ZSLDB/iPhone15Pro 2509.09241](https://arxiv.org/abs/2509.09241)、[Bayer-domain CV 2501.15119](https://arxiv.org/abs/2501.15119)、[ISP-less CV 2210.05451](https://arxiv.org/pdf/2210.05451)
+- 饱和置信掩码先验:[Gated depth uncertainty 2003.05122](https://arxiv.org/pdf/2003.05122)、[Kendall&Gal 1703.04977](https://arxiv.org/abs/1703.04977)
+- 可微 ISP/tone-map:[DynamicISP ICCV2023](https://openaccess.thecvf.com/content/ICCV2023/papers/Yoshimura_DynamicISP_Dynamically_Controlled_Image_Signal_Processor_for_Image_Recognition_ICCV_2023_paper.pdf)、[AdaptiveISP 2410.22939](https://arxiv.org/pdf/2410.22939)、[Princeton HDR-ISP ICCP2020](https://light.princeton.edu/publication/hdr_isp_opt/)、[TCNet 2410.18340](https://arxiv.org/pdf/2410.18340)、[Dark-ISP 2509.09183](https://arxiv.org/abs/2509.09183)
+- 逆ISP饱和不可逆弹药(2026-06-15 新增):[Beyond Learned Metadata 2306.12058](https://arxiv.org/pdf/2306.12058)、[Overexposure Mask Fusion Reverse-ISP 2210.11511](https://arxiv.org/pdf/2210.11511)、[InvISP 2103.15061](https://arxiv.org/pdf/2103.15061)
+- sim-to-real 可借鉴(2026-06-15 新增):[RaSim 2404.03962](https://arxiv.org/pdf/2404.03962)、[Focus on Defocus CVPR2020](https://openaccess.thecvf.com/content_CVPR_2020/papers/Maximov_Focus_on_Defocus_Bridging_the_Synthetic_to_Real_Domain_Gap_CVPR_2020_paper.pdf)、[Robust MDE Non-Lambertian 2408.06083](https://arxiv.org/pdf/2408.06083)
+- 深度线索 vs 画质视觉科学(2026-06-15 新增):[Specular convexity PLOS CB 2014](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003576)、[Gloss/luminance-edge JOV](https://jov.arvojournals.org/article.aspx?articleid=2752942)
+
+**A② 免训练单步扩散米制(§4)**
+- 灵感/迁移:[ChordEdit 2602.19083](https://arxiv.org/abs/2602.19083)、[ETC 2510.24129](https://arxiv.org/abs/2510.24129)
+- 单步深度(要训练,对照):[E2E-FT 2409.11355](https://arxiv.org/abs/2409.11355)、[Lotus 2409.18124](https://arxiv.org/abs/2409.18124)、[GeoWizard 2403.12013](https://arxiv.org/abs/2403.12013)、[DepthFM 2403.13788](https://arxiv.org/html/2403.13788v1)、[FE2E 2509.04338](https://arxiv.org/html/2509.04338v1)、[SharpDepth 2411.18229](https://arxiv.org/html/2411.18229v1)、[Taming Diffusion 2501.02576](https://arxiv.org/html/2501.02576)
+- OT 单步生成:[OFM NeurIPS24 / 2403.13117](https://arxiv.org/pdf/2403.13117)、[OT-NFM 2604.06413](https://arxiv.org/pdf/2604.06413)
+- 几何锚米制:[GeoDiff 2510.18291](https://arxiv.org/pdf/2510.18291)、[Defocus-cue Marigold 2505.17358](https://arxiv.org/pdf/2505.17358)、[GRIN 2409.09896](https://arxiv.org/abs/2409.09896)、[DMD 2312.13252](https://arxiv.org/pdf/2312.13252)、[Marigold-DC 2412.13389](https://arxiv.org/html/2412.13389v1)、[AnchorD 2605.02667](https://arxiv.org/abs/2605.02667)（⚠️需传感器深度锚/因子图，非扩散）
+- 单步 training-free guidance 机制(2026-06-15 新增,撑 L2/§4.4):[CoSIGN 2407.12676](https://arxiv.org/pdf/2407.12676)（ECCV24,1–2 NFE 引导）、[ReCFG 2410.18737](https://arxiv.org/pdf/2410.18737)（闭式非迭代）、[Projected Diffusion 2402.03559](https://arxiv.org/pdf/2402.03559)、[Spherical Gaussian Constraint 2402.03201](https://arxiv.org/pdf/2402.03201)、[Understanding Training-free Guidance NeurIPS24](https://proceedings.neurips.cc/paper_files/paper/2024/file/c4edc5113b4ffd4632718558fb66b9ef-Paper-Conference.pdf)
+- 2026 单步深度撞车追踪(2026-06-15 新增):[Need for Speed/Marigold-SSD 2603.10584](https://arxiv.org/abs/2603.10584)（单步但要训练+深度补全）、[Efficient Training-Free Single-Image Diffusion 2606.04299](https://arxiv.org/abs/2606.04299)（CVPR2026 highlight,通用生成）、[AnchorD 2605.02667](https://arxiv.org/abs/2605.02667)（⚠️需传感器深度锚/因子图，非扩散）
+- 单步 training-free guidance 机制(2026-06-15 新增,撑 L2/§4.4):[CoSIGN 2407.12676](https://arxiv.org/pdf/2407.12676)（ECCV24,1–2 NFE 引导）、[ReCFG 2410.18737](https://arxiv.org/pdf/2410.18737)（闭式非迭代）、[Projected Diffusion 2402.03559](https://arxiv.org/pdf/2402.03559)、[Spherical Gaussian Constraint 2402.03201](https://arxiv.org/pdf/2402.03201)、[Understanding Training-free Guidance NeurIPS24](https://proceedings.neurips.cc/paper_files/paper/2024/file/c4edc5113b4ffd4632718558fb66b9ef-Paper-Conference.pdf)
+- 2026 单步深度撞车追踪(2026-06-15 新增):[Need for Speed/Marigold-SSD 2603.10584](https://arxiv.org/abs/2603.10584)（单步但要训练+深度补全）、[Efficient Training-Free Single-Image Diffusion 2606.04299](https://arxiv.org/abs/2606.04299)（CVPR2026 highlight,通用生成）
+- 米制 SOTA 基线:[UniDepth 2403.18913](https://arxiv.org/pdf/2403.18913)、[Metric3D v2 2404.15506](https://arxiv.org/pdf/2404.15506)、[Depth Pro 2410.02073](https://arxiv.org/pdf/2410.02073)
+
+**基础与其他**
+- [Marigold 2312.02145](https://arxiv.org/html/2312.02145)、[Depth Anything V2 2406.09414](https://arxiv.org/html/2406.09414)、[Video Depth Anything CVPR2025](https://github.com/DepthAnything/Video-Depth-Anything)、[单目米制深度综述 2501.11841](https://arxiv.org/html/2501.11841v4)
+- 评测元问题:[How to Evaluate MDE? 2510.19814](https://arxiv.org/html/2510.19814v1)
+- 不确定性:[UQ×基础模型综述 2501.08188](https://arxiv.org/html/2501.08188v1)
+
+> ⚠️ 谨慎引用:EASD = MDPI(源策略排除,仅对比);StereoRAW 等专利仅作概念佐证;标 arXiv 预印本者投稿前须核实正式收录(尤其 ZSLDB 2509.09241、TCNet 2410.18340、GeoDiff 2510.18291、Defocus-Marigold 2505.17358、FE2E 2509.04338、Dark-ISP 2509.09183、AnchorD 2605.02667、Need-for-Speed 2603.10584、Efficient-SID 2606.04299)。
+
+## 10. 修订记录(changelog)
+
+> 把层累的核查过程压在这里,供追溯;正文只留最新结论。
+
+- **2026-06-09 初版**:从综述展望生成 5 个 idea + ChordEdit 迁移评估。A① HDR 标 ★★★★(当时判"全网空白")。
+- **2026-06-14 ①venue 切换**:目标从机器人(IROS/ICRA/CoRL)→ 算法顶会(CVPR/ECCV/NeurIPS)。Idea 2 失去部署卖点降级;A①、A② 升为双主攻。
+- **2026-06-14 ②证伪式重搜**:带"HDR 曝光感知已是主流趋势"假设重搜 → **推翻**。既非"主流趋势"(主会无一篇),也非"全网空白"(EASD 等零散先例存在)。A① 由 ★★★★ **下调 ★★★**,卖点收窄为三元组(§3.1)。Hypersim 确认解决合成数据。下载首批 8 篇至 `papers/12_HDR_RAW_Exposure/`。
+- **2026-06-14 ③A①/A② 深度核查**:A① 确认真实 RAW+深度数据 NO-GO→ 三层数据策略(§3.6);新增 TCNet 可微前端锚点(§3.7)。A② **上调可信度**——"OT 时间平滑迁稠密深度回归"确认完全空白(§4.3 节2),但坐实 E2E-FT/GeoDiff 两面夹击,确立捆绑差异化(§4.4)。
+- **2026-06-14 ④重构**:文档由"按时间层累(§8.5/8.7/8.8)"重组为"按逻辑组织(四部分)",消除互相推翻与跳号。
+- **2026-06-15 ⑤A② 立项卡升级**:§4 由"核查粒度"升级到与 §3 对等的"立项卡粒度"。新增:Problem(P1加速/P2米制双子问题)、机制级 core insight(目标端未知的非平凡重定义 + Tweedie 代理锚赌注)、CCF 锚点/目标场重定义的 method 骨架、**双 Linchpin**(L1 采样期注入 vs 后处理标定、L2 单步 vs 多步引导)、按毒性排序的 reviewer 攻击、B1激进/B2稳健两分支。诚实定级:A② 科学风险高于 A①(执行风险),新意则更强(机制级)。
+- **2026-06-15 ⑥八问深挖(go/no-go 均未变,证据加固)**:针对 A①/A② 各 4 问做证据级深挖,下载 6 篇新论文(papers/12 +3、papers/13 +3)。**A①**:① 逆ISP饱和不可逆已量化(Beyond-Metadata:14-bit[16313,16383]→8-bit 255 多对一;Overexposure-Mask-Fusion 专攻过曝逆ISP),写进 §3.7b 作 limitation 弹药而非藏短板;② RAW 域深度专门 sim-to-real 仍空白,RaSim(物理接地仿真)/Focus-on-Defocus(域不变线索)为可借鉴先例(§3.6 补);③ 新最近邻 Dark-ISP(可微 linear+nonlinear ISP,但检测+低光),§3.4/§3.7 加正面区分,"为深度联合优化可微前端"仍空白;④ "深度线索保持 vs 画质"找到视觉科学地基——shape-from-shading 依赖梯度**序结构**、gloss 依赖**幅值+直方图偏度**的 dissociation(§3.7c)。**A②**:① 2026 撞车追踪——Need-for-Speed(单步但要训练+补全)、AnchorD(免训练但需传感器锚+因子图)、Efficient-SID(通用)、ChordEdit 无后续,三角仍空白(§4.5 节4);② Tweedie/x0+OT 平均两零件各有成熟数学基础(Universal-Guidance/NeurIPS24),组合待验,可行性从"全无"升"两零件有据"(§4.4 补);③ **L1 门槛升级**:AnchorD 证明免训练 patch-wise affine 已能保局部结构,对照臂须加 patch-affine 档,不能只跑 2-DOF;**L2 获机制弹药**:CoSIGN 实证 DPS 式梯度引导在 1–2 NFE 失效、改"软约束+投影"可成,正撑 §4.7"烘焙进方向非事后梯度"(§4.8 双 L 补强);④ metric 横比锚点数值入库(Metric3Dv2 KITTI/NYU AbsRel≈0.042、δ1≈0.98)+ 三项协议陷阱(crop/cap/对齐)(§4.10 补)。
+- **2026-06-22 ⑦机制谱系沉到前沿追踪层**:应主攻聚焦需求,把 A② 的扩散深度机制谱系重构进 `docs/03_MDE_frontier.md` **B3**(B3.1 范式→B3.2 提速→B3.3 单步内核→B3.4 米制→B3.5 精读路线),作为本立项卡的"机制地基"。本卡 §4 标题下加指针指向 B3;综述报告 §9.6、前沿追踪 5 处旧 `8.5` 死链一并修正(原 §8.5 在 ④重构时已并入本 §4)。**内容零新增,纯重组 + 死链修复 + 阅读动线**;go/no-go 不变。
+- **2026-06-22 ⑧精读 ChordEdit/Marigold 全文,两处实质修正(go/no-go 不变)**:① **命名诚实改判(推翻 ⑤/⑥ 及实验方案前述)**——精读证实 **"Chord Control Field (CCF)" 是 ChordEdit 原论文术语**(33 处,p.7 §6.1 定义缩写),非本库提炼词;前述"原论文无 CCF 字样"系误判,已删。真正要标注的是**定义差异**(原=两 prompt drift 平均;A②=指向 Tweedie 锚的位移场平均),写作沿用须引 ChordEdit + 明示重定义,或用 `proxy-anchored CCF`(§4.3 命名澄清)。② **🔴 §4.9 新增最毒攻击维度:有偏锚 vs 零均值噪声**——ChordEdit 时间平均成立的前提是测量噪声 `ε` 零均值(Eq 4.2)→ 纯降方差(附录 D);A② 的 Tweedie 锚是 MMSE **有偏**估计,平均压方差不压偏差,故 ChordEdit 成功**不能外推**,净增益须靠几何锚纠偏或偏差随 t 抵消(§4.4 赌注难点 + §4.9 新行 + 实验方案 §7-4 + 骨架代码注)。另:修复 Marigold 归档 PDF 下载损坏(4.3MB 截断→重下 23MB 完整版)。

@@ -8,8 +8,10 @@ This is a monocular depth estimation research workspace. Write research notes in
 
 - `docs/00_A2.md`: active A2 research brief and commands.
 - `a2/`: active A2 code.
-- `docs/01_A2_idea.md` to `docs/05_MDE_survey.md`: retained long-form notes. Treat as reference, not the current entry point.
-- `papers/`: archived PDFs.
+- `docs/目录.md`: current documentation index.
+- `docs/选题/`: current research ideas, experiment routes, and archived old idea notes.
+- `docs/文献调研/`: literature notes, frontier topic briefs, and archived long-form surveys.
+- `papers/`: archived PDFs, currently organized by the G1 three-era MDE trajectory.
 - `tools/`: helper scripts.
 
 Edit A2 code under `a2/`.
