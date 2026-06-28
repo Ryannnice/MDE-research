@@ -147,7 +147,7 @@ python A2_run_grid.py --phase L2 --backbone marigold --model_id prs-eth/marigold
 
 - `../文献调研/前沿专题/02_扩散深度与近单步米制化.md`
 - `../文献调研/前沿专题/05_评测协议与可比性.md`
-- 历史全文:`../文献调研/归档/03_MDE前沿追踪_全文.md` B3
+- 历史全文:`../文献调研/综述/03_MDE前沿追踪_全文.md` B3
 
 ## Current Verdict
 
