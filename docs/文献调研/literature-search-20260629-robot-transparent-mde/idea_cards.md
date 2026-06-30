@@ -2,6 +2,8 @@
 
 Date: 2026-06-29
 
+Update: 2026-06-30 重新细化调研后，ReMake 官方代码、checkpoint、训练脚本和 3090 训练成本已核验；SeeClear 为 code-only release，权重和数据待发布；AISPO 仍未找到公开代码。
+
 Mode: standard idea optimization after literature search.
 
 Venue lens: 默认按 CCF-A CVPR/ICCV/AI/CV 口径打磨问题、机制和证据；机器人抓取实验作为应用证据。若主投稿机器人方向，可转 ICRA/CoRL/RSS/RAL，但不把这些直接称为 CCF-A。
@@ -33,7 +35,7 @@ Proposed mechanism:
 - 输入: RGB，透明/反光 mask 可选，稀疏锚来自 oracle GT、有效 RGB-D 非透明区、桌面平面或 one-shot calibration。
 - 骨干: Marigold/E2E-FT/Lotus/DepthFM 等冻结深度先验。
 - 核心操作: 沿用 A2 proxy-anchored CCF + 几何锚采样期烘焙。
-- 对照: 全局 affine、patch-wise affine、AnchorD-like 后处理、MOMA-style sparse alignment、ReMake/AISPO-like depth completion。
+- 对照: 全局 affine、patch-wise affine、AnchorD-like 后处理、MOMA-style sparse alignment、ReMake 可运行 depth completion、AISPO-like shape-prior depth completion 观察项。
 - 输出: 单层 grasp-relevant metric depth，限定为接触/前表面，不声称完整多层透明重建。
 
 Contribution type: 方法 + 应用 failure-slice 评测。
@@ -68,7 +70,7 @@ Core insight: 与其先做新模型，不如先把“透明抓取到底如何评
 Proposed mechanism:
 
 - 数据: TransCG、ClearPose、Booster、LayeredDepth。
-- 模型: Depth Anything V2、Metric3D、UniDepth、Depth Pro、Marigold/E2E-FT、DepthFM、MOMA/ReMake/AISPO 若代码可用。
+- 模型: Depth Anything V2、Metric3D、UniDepth、Depth Pro、Marigold/E2E-FT、DepthFM、MOMA/ReMake；AISPO 先作为无代码强观察项，代码公开后进入可跑 baseline。
 - 协议: metric zero-align 主表，affine-invariant 对照，透明 mask、边界、无锚区、遮挡/多层冲突区单独报告。
 - 物理指标: invalid grasp proxy、contact-surface error、depth discontinuity sanity、平面/碰撞可行性。
 
@@ -202,7 +204,7 @@ Best use: 与 Candidate 1 合并，作为 A2 透明抓取版的 anchor-source ch
 
 题目草案: `Transparent-Grasp Metric Anchoring: Training-Free Sampling-Time Depth Correction for Frozen Diffusion MDE`
 
-一句话: 在透明/反光物体抓取场景中，用少量机器人可得几何锚在冻结扩散深度采样期注入 metric constraint，证明它比同源 post-hoc patch/mask alignment 更能修正透明区域和无锚区域的 grasp-relevant metric depth。
+一句话: 在透明/反光物体抓取场景中，用少量机器人可得几何锚在冻结扩散深度采样期注入 metric constraint，检验它是否比同源 post-hoc patch/mask alignment 更能修正透明区域和无锚区域的 grasp-relevant metric depth。
 
 为什么它最贴 A2:
 
@@ -216,7 +218,7 @@ Best use: 与 Candidate 1 合并，作为 A2 透明抓取版的 anchor-source ch
 | Stage | Dataset / setting | Claim | Baselines | Status |
 |---|---|---|---|---|
 | S0 | A2 原 NYU/KITTI 或 mock | 原 gate 不破 | A2 原臂 | 待跑 |
-| S1 | TransCG / ClearPose | 透明 mask 内 metric depth correction | ClearGrasp、LIDF、TransCG baseline、patch affine、ReMake/AISPO 若可跑 | 待跑 |
+| S1 | TransCG / ClearPose | 透明 mask 内 metric depth correction | ClearGrasp、LIDF、TransCG baseline、patch affine、ReMake 可跑版本、AISPO 论文级观察 | 待跑 |
 | S2 | Booster | 非朗伯 MDE failure slice | Depth Anything V2、Metric3D、UniDepth、Depth Pro、Marigold/E2E-FT、Depth4ToM、Robust MDE | 待跑 |
 | S3 | LayeredDepth / SeeGroup subset | 单层 contact-surface claim 边界 | single-layer MDE、SeeGroup | 待跑 |
 | S4 | Robot/grasp proxy | 修正深度是否减少 invalid grasp | MOMA、ReMake、AISPO、ASGrasp/ClearDepth 作为不同传感器上界 | 待跑 |
@@ -234,5 +236,5 @@ Best use: 与 Candidate 1 合并，作为 A2 透明抓取版的 anchor-source ch
 1. 在 A2 failure slices 中把透明/反光从合成 mask 扩展到 TransCG/ClearPose/Booster 的真实 mask。
 2. 增加 `transparent_mask_absrel`、`transparent_boundary_rmse`、`no_anchor_transparent_absrel`、`contact_surface_proxy` 占位指标。
 3. 增加 realistic anchor simulator: table plane、valid RGB-D non-transparent points、one-shot sparse calibration、anchor noise/dropout。
-4. 跑 `patch affine`、`MOMA-style global/scale-rotation-shift`、`ReMake/AISPO if available` 的后处理对照。
+4. 跑 `patch affine`、`MOMA-style global/scale-rotation-shift`、`ReMake` 的后处理/补全对照；继续监控 AISPO 代码公开。
 5. 所有数字保持 `待跑`，直到真实 CSV 存在。
