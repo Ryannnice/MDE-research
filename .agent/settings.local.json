@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)"
+    ]
+  },
+  "skillOverrides": {
+    "ccf-paper-to-exemplar": "off",
+    "ccf-rebuttal-writer": "off",
+    "ccf-skill-forger": "off"
+  }
+}
