@@ -22,9 +22,9 @@ from PIL import Image
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", default="data/external/remake/official")
-    parser.add_argument("--checkpoint", default="weights/transparent/remake/checkpoint.tar")
-    parser.add_argument("--out-dir", default="runs/transparent/remake/minimal")
+    parser.add_argument("--repo", default="透明物体/external/remake/official")
+    parser.add_argument("--checkpoint", default="透明物体/weights/remake/checkpoint.tar")
+    parser.add_argument("--out-dir", default="透明物体/runs/remake/minimal")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--rgb", default=None, help="Optional RGB image path.")
     parser.add_argument("--depth", default=None, help="Optional raw depth path.")

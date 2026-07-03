@@ -24,12 +24,12 @@ TransCG 的问题设定是透明物体 RGB-D depth completion。输入不是单 
 
 已完成:
 
-- 官方代码已克隆到 `data/external/transcg/official/`，提交为 `135f9e0ad20592cb40b288c152aff5eda033a765`。
+- 官方代码已克隆到 `透明物体/external/transcg/official/`，提交为 `135f9e0ad20592cb40b288c152aff5eda033a765`。
 - conda 环境 `transcg` 已创建，Python 3.10。
 - 已安装 CPU 版 PyTorch 和最小 inference 依赖。
-- 官方 checkpoint 已下载到 `weights/transparent/transcg/checkpoint.tar`，文件大小约 5.2MB，checkpoint epoch 为 12。
-- 已添加无 GUI 最小脚本 `tools/repro/transparent/transcg/run_dfnet_minimal.py`。
-- 已跑通一次合成 RGB-D smoke test，输出在 `runs/transparent/transcg/minimal_synthetic/`。
+- 官方 checkpoint 已下载到 `透明物体/weights/transcg/checkpoint.tar`，文件大小约 5.2MB，checkpoint epoch 为 12。
+- 已添加无 GUI 最小脚本 `透明物体/复现/tools/transcg/run_dfnet_minimal.py`。
+- 已跑通一次合成 RGB-D smoke test，输出在 `透明物体/runs/transcg/minimal_synthetic/`。
 
 未完成:
 
@@ -39,28 +39,24 @@ TransCG 的问题设定是透明物体 RGB-D depth completion。输入不是单 
 ## 文件夹结构
 
 ```text
-data/
+透明物体/
   external/transcg/official/        # 官方 TransCG 代码，git clone，忽略入库
 
-weights/
-  transparent/transcg/checkpoint.tar # 官方 DFNet checkpoint，忽略入库
+  weights/transcg/checkpoint.tar    # 官方 DFNet checkpoint，忽略入库
 
-runs/
-  transparent/transcg/minimal_synthetic/
-    input_rgb.png
-    input_depth_raw_mm.png
-    dfnet_depth_mm.png
-    dfnet_depth_vis.png
-    summary.json
+  runs/transcg/minimal_synthetic/
+      input_rgb.png
+      input_depth_raw_mm.png
+      dfnet_depth_mm.png
+      dfnet_depth_vis.png
+      summary.json
 
-tools/
-  repro/transparent/transcg/run_dfnet_minimal.py
+  复现/tools/transcg/run_dfnet_minimal.py
 
-docs/
-  复现/透明物体/TransCG_DFNet.md
+  复现/TransCG_DFNet.md
 ```
 
-这个结构遵守仓库 README: 真实数据放 `data/`，权重放 `weights/`，实验输出放 `runs/`。这些目录已被 `.gitignore` 忽略。
+这个结构遵守当前三类目录: 透明物体相关外部代码、权重、输出和复现记录都收在 `透明物体/` 下。真实数据如需下载, 建议放 `透明物体/data/` 并继续忽略入库。
 
 ## 环境
 
@@ -83,14 +79,14 @@ opencv-python 4.13.0
 ## 已执行命令
 
 ```bash
-mkdir -p data/external/transcg weights/transparent/transcg runs/transparent/transcg
-git clone https://github.com/galaxies99/transcg.git data/external/transcg/official
+mkdir -p 透明物体/external/transcg 透明物体/weights/transcg 透明物体/runs/transcg
+git clone https://github.com/galaxies99/transcg.git 透明物体/external/transcg/official
 
 conda run -n transcg gdown 1oZi9zdOg0WYuTHM10xlyq5FRlfoKDKzU \
-  -O weights/transparent/transcg/checkpoint.tar
+  -O 透明物体/weights/transcg/checkpoint.tar
 
-conda run -n transcg python tools/repro/transparent/transcg/run_dfnet_minimal.py \
-  --out-dir runs/transparent/transcg/minimal_synthetic
+conda run -n transcg python 透明物体/复现/tools/transcg/run_dfnet_minimal.py \
+  --out-dir 透明物体/runs/transcg/minimal_synthetic
 ```
 
 输出摘要:
@@ -125,27 +121,27 @@ conda run -n transcg python tools/repro/transparent/transcg/run_dfnet_minimal.py
 建议真实数据放:
 
 ```text
-data/transparent/transcg/
+透明物体/data/transcg/
 ```
 
 下载命令:
 
 ```bash
-mkdir -p data/transparent/transcg
+mkdir -p 透明物体/data/transcg
 conda run -n transcg gdown 18LkbelKNTURF-8f8N-ykzs79FJ013knH \
-  -O data/transparent/transcg/transcg-info.zip
+  -O 透明物体/data/transcg/transcg-info.zip
 conda run -n transcg gdown 19tXZ9lzpW2gUk1ibkij76I_-oknCbqyP \
-  -O data/transparent/transcg/transcg-data-3.zip
+  -O 透明物体/data/transcg/transcg-data-3.zip
 ```
 
 解压后按实际根目录调整路径。若得到 `scene21/1/rgb1.png`、`depth1.png`、`depth1-gt.png`，可直接运行:
 
 ```bash
-conda run -n transcg python tools/repro/transparent/transcg/run_dfnet_minimal.py \
-  --rgb data/transparent/transcg/scene21/1/rgb1.png \
-  --depth data/transparent/transcg/scene21/1/depth1.png \
-  --gt data/transparent/transcg/scene21/1/depth1-gt.png \
-  --out-dir runs/transparent/transcg/scene21_1_dfnet
+conda run -n transcg python 透明物体/复现/tools/transcg/run_dfnet_minimal.py \
+  --rgb 透明物体/data/transcg/scene21/1/rgb1.png \
+  --depth 透明物体/data/transcg/scene21/1/depth1.png \
+  --gt 透明物体/data/transcg/scene21/1/depth1-gt.png \
+  --out-dir 透明物体/runs/transcg/scene21_1_dfnet
 ```
 
 ## 结论

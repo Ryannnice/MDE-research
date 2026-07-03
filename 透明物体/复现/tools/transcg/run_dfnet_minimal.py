@@ -3,7 +3,7 @@
 
 This script intentionally does not modify the upstream TransCG repository.
 It imports the official model code, loads the official checkpoint, and writes
-depth outputs under runs/.
+depth outputs under 透明物体/runs/.
 """
 
 from __future__ import annotations
@@ -23,10 +23,10 @@ from scipy.interpolate import NearestNDInterpolator
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", default="data/external/transcg/official")
-    parser.add_argument("--config", default="data/external/transcg/official/configs/inference.yaml")
-    parser.add_argument("--checkpoint", default="weights/transparent/transcg/checkpoint.tar")
-    parser.add_argument("--out-dir", default="runs/transparent/transcg/minimal")
+    parser.add_argument("--repo", default="透明物体/external/transcg/official")
+    parser.add_argument("--config", default="透明物体/external/transcg/official/configs/inference.yaml")
+    parser.add_argument("--checkpoint", default="透明物体/weights/transcg/checkpoint.tar")
+    parser.add_argument("--out-dir", default="透明物体/runs/transcg/minimal")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--rgb", default=None, help="Optional RGB image path.")
     parser.add_argument("--depth", default=None, help="Optional raw depth image path.")

@@ -20,8 +20,8 @@
 | 是否依赖 MDE | 否 | 是，Depth Anything / LeReS |
 | 是否依赖 mask | 训练/评测使用 GT mask 指标，模型输入不显式用 mask | 是，mask 是模型输入 |
 | 主要数据 | TransCG | TransCG、ClearGrasp |
-| 当前 checkpoint | `weights/transparent/transcg/checkpoint.tar`, epoch 12 | `weights/transparent/remake/checkpoint.tar`, epoch 39 |
-| 当前复现 | `tools/repro/transparent/transcg/run_dfnet_minimal.py` | `tools/repro/transparent/remake/run_remake_minimal.py` |
+| 当前 checkpoint | `透明物体/weights/transcg/checkpoint.tar`, epoch 12 | `透明物体/weights/remake/checkpoint.tar`, epoch 39 |
+| 当前复现 | `透明物体/复现/tools/transcg/run_dfnet_minimal.py` | `透明物体/复现/tools/remake/run_remake_minimal.py` |
 | 官方测试状态 | 待跑 | 待跑 |
 
 ## 1. TransCG / DFNet
@@ -46,11 +46,11 @@ TransCG 的问题设定是透明物体 RGB-D depth completion。它不是单目�
 
 | 模块 | 本地路径 | 作用 |
 |---|---|---|
-| DFNet 模型 | `data/external/transcg/official/models/DFNet.py` | RGB + depth 到 completed depth 的主网络 |
-| 数据集类 | `data/external/transcg/official/datasets/transcg.py` | 读取 TransCG metadata、scene、RGB/depth/GT/mask |
-| 推理类 | `data/external/transcg/official/inference.py` | checkpoint 加载、depth 预处理、模型前向、反归一化 |
-| 默认配置 | `data/external/transcg/official/configs/default.yaml` | 模型参数、数据路径、训练/测试指标 |
-| 最小复现脚本 | `tools/repro/transparent/transcg/run_dfnet_minimal.py` | 无 GUI smoke test，支持合成输入或真实 RGB-D 路径 |
+| DFNet 模型 | `透明物体/external/transcg/official/models/DFNet.py` | RGB + depth 到 completed depth 的主网络 |
+| 数据集类 | `透明物体/external/transcg/official/datasets/transcg.py` | 读取 TransCG metadata、scene、RGB/depth/GT/mask |
+| 推理类 | `透明物体/external/transcg/official/inference.py` | checkpoint 加载、depth 预处理、模型前向、反归一化 |
+| 默认配置 | `透明物体/external/transcg/official/configs/default.yaml` | 模型参数、数据路径、训练/测试指标 |
+| 最小复现脚本 | `透明物体/复现/tools/transcg/run_dfnet_minimal.py` | 无 GUI smoke test，支持合成输入或真实 RGB-D 路径 |
 
 ### 模型结构
 
@@ -142,8 +142,8 @@ scene{scene_id}/{perspective_id}/
 已完成:
 
 ```bash
-conda run -n transcg python tools/repro/transparent/transcg/run_dfnet_minimal.py \
-  --out-dir runs/transparent/transcg/minimal_synthetic_verify2
+conda run -n transcg python 透明物体/复现/tools/transcg/run_dfnet_minimal.py \
+  --out-dir 透明物体/runs/transcg/minimal_synthetic_verify2
 ```
 
 输出摘要:
@@ -187,12 +187,12 @@ RGB + raw depth + monocular relative depth + instance mask
 
 | 模块 | 本地路径 | 作用 |
 |---|---|---|
-| ReMake 模型 | `data/external/remake/official/models/remake.py` | RGB/mask、relative depth、raw depth 三路融合网络 |
-| TransCG 数据集类 | `data/external/remake/official/datasets/transcg.py` | 读取 TransCG RGB/depth/GT/mask，并生成训练输入 |
-| 推理类 | `data/external/remake/official/run_utils/inferencer.py` | 加载 checkpoint、生成 relative depth、调用 ReMake |
-| 测试配置 | `data/external/remake/official/configs/test/transcg_remake.yaml` | TransCG 测试配置、指标、MDE 模型设置 |
-| 推理配置 | `data/external/remake/official/configs/inference/remake.yaml` | 单样本 inference 设置 |
-| 最小复现脚本 | `tools/repro/transparent/remake/run_remake_minimal.py` | 无 GUI smoke test，绕开完整 Depth Anything 链路 |
+| ReMake 模型 | `透明物体/external/remake/official/models/remake.py` | RGB/mask、relative depth、raw depth 三路融合网络 |
+| TransCG 数据集类 | `透明物体/external/remake/official/datasets/transcg.py` | 读取 TransCG RGB/depth/GT/mask，并生成训练输入 |
+| 推理类 | `透明物体/external/remake/official/run_utils/inferencer.py` | 加载 checkpoint、生成 relative depth、调用 ReMake |
+| 测试配置 | `透明物体/external/remake/official/configs/test/transcg_remake.yaml` | TransCG 测试配置、指标、MDE 模型设置 |
+| 推理配置 | `透明物体/external/remake/official/configs/inference/remake.yaml` | 单样本 inference 设置 |
+| 最小复现脚本 | `透明物体/复现/tools/remake/run_remake_minimal.py` | 无 GUI smoke test，绕开完整 Depth Anything 链路 |
 
 ### 模型结构
 
@@ -286,8 +286,8 @@ dataset:
 已完成:
 
 ```bash
-conda run -n remake python tools/repro/transparent/remake/run_remake_minimal.py \
-  --out-dir runs/transparent/remake/minimal_synthetic_verify
+conda run -n remake python 透明物体/复现/tools/remake/run_remake_minimal.py \
+  --out-dir 透明物体/runs/remake/minimal_synthetic_verify
 ```
 
 输出摘要:

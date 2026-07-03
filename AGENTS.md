@@ -2,23 +2,31 @@
 
 ## Nature
 
-This is a monocular depth estimation research workspace. Write research notes in Simplified Chinese.
+This is a research workspace organized into three top-level themes: `MDE`, `透明物体`, and `Agentic Robot`. Write research notes in Simplified Chinese.
 
 ## Layout
 
-- `docs/00_A2.md`: active A2 research brief and commands.
-- `a2/`: active A2 code.
-- `docs/目录.md`: current documentation index.
-- `docs/选题/`: current research ideas, experiment routes, and archived old idea notes.
-- `docs/文献调研/`: literature notes, frontier topic briefs, and archived long-form surveys.
-- `papers/`: archived PDFs, currently organized by the G1 three-era MDE trajectory.
-- `tools/`: helper scripts.
+- `MDE/`: monocular depth estimation research assets.
+  - `MDE/目录.md`: MDE documentation index.
+  - `MDE/选题/`: current MDE ideas, experiment routes, and archived old idea notes.
+  - `MDE/文献调研/`: MDE literature notes, frontier topic briefs, and surveys.
+  - `MDE/papers/`: MDE PDFs organized by the G1 three-era trajectory.
+- `透明物体/`: transparent/non-Lambertian object depth for robotics.
+  - `透明物体/透明物体单目深度估计用于机器人.md`: main transparent-object brief.
+  - `透明物体/复现/`: reproduction notes and minimal runners.
+  - `透明物体/external/`: external code snapshots.
+  - `透明物体/pdfs/`: transparent-object PDFs.
+- `Agentic Robot/`: long-horizon robot manipulation with agentic VLA/VLM loops.
+  - `Agentic Robot/目录.md`: Agentic Robot documentation index.
+  - `Agentic Robot/文献调研/`: Agentic Robot literature notes.
+  - `Agentic Robot/papers/`: Agentic Robot PDFs.
+- `.agent/skills/`: project-local CCFA skills.
 
-Edit A2 code under `a2/`.
+Put new files under the matching top-level theme. Do not put Agentic Robot notes back under `MDE/`.
 
 ## A2 Verification
 
-After changing A2 code, run:
+If A2 code is present and changed, run:
 
 ```bash
 cd a2
@@ -39,4 +47,4 @@ done
 
 ## Skills
 
-Project-local CCFA skills are exposed through `.agents/skills -> .claude/skills`.
+Project-local CCFA skills are under `.agent/skills/`.

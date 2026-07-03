@@ -1,7 +1,7 @@
 # Agentic Robot 与 Goal2Skill 方向调研
 
 日期: 2026-07-01  
-对象: `agentic_robot/Agentic Robot.pdf`, `agentic_robot/Goal2Skill.pdf`  
+对象: `../papers/Agentic Robot.pdf`, `../papers/Goal2Skill.pdf`
 方向名: 面向长程机器人操作的 agentic VLA/VLM 闭环系统, 重点是任务分解、记忆、验证、反思与恢复。  
 调研原则: CCFA standard mode; 优先官方论文页、项目页、GitHub、arXiv/OpenReview/CVF/PMLR/IEEE/ACM; 不纳入 MDPI; 未复现实验一律写原文报告或待跑。
 
@@ -398,8 +398,8 @@ global goal + observation
 
 主要来源:
 
-- 本地 PDF: `agentic_robot/Agentic Robot.pdf`
-- 本地 PDF: `agentic_robot/Goal2Skill.pdf`
+- 本地 PDF: `../papers/Agentic Robot.pdf`
+- 本地 PDF: `../papers/Goal2Skill.pdf`
 - Agentic Robot: https://agentic-robot.github.io
 - Agentic Robot GitHub: https://github.com/Agentic-Robot/agentic-robot
 - RMBench: https://rmbench.github.io/

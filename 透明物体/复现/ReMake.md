@@ -26,12 +26,12 @@ ReMake 的完整题目是 *Rethinking Transparent Object Grasping: Depth Complet
 
 已完成:
 
-- 官方代码已克隆到 `data/external/remake/official/`，提交为 `4f568148c8421544136bf49bb941149e0c990a34`。
+- 官方代码已克隆到 `透明物体/external/remake/official/`，提交为 `4f568148c8421544136bf49bb941149e0c990a34`。
 - conda 环境 `remake` 已创建，Python 3.10。
 - 已安装 CPU 版 PyTorch/torchvision 和最小前向依赖。
-- 官方 checkpoint 已下载到 `weights/transparent/remake/checkpoint.tar`，文件大小约 35MB，checkpoint epoch 为 39。
-- 已添加无 GUI 最小脚本 `tools/repro/transparent/remake/run_remake_minimal.py`。
-- 已跑通一次合成输入 smoke test，输出在 `runs/transparent/remake/minimal_synthetic/`。
+- 官方 checkpoint 已下载到 `透明物体/weights/remake/checkpoint.tar`，文件大小约 35MB，checkpoint epoch 为 39。
+- 已添加无 GUI 最小脚本 `透明物体/复现/tools/remake/run_remake_minimal.py`。
+- 已跑通一次合成输入 smoke test，输出在 `透明物体/runs/remake/minimal_synthetic/`。
 
 未完成:
 
@@ -42,27 +42,23 @@ ReMake 的完整题目是 *Rethinking Transparent Object Grasping: Depth Complet
 ## 文件夹结构
 
 ```text
-data/
+透明物体/
   external/remake/official/          # 官方 ReMake 代码，git clone，忽略入库
 
-weights/
-  transparent/remake/checkpoint.tar  # 官方 ReMake checkpoint，忽略入库
+  weights/remake/checkpoint.tar      # 官方 ReMake checkpoint，忽略入库
 
-runs/
-  transparent/remake/minimal_synthetic/
-    input_rgb.png
-    input_depth_raw_mm.png
-    input_mask.png
-    input_relative_depth_u16.png
-    remake_depth_mm.png
-    remake_depth_vis.png
-    summary.json
+  runs/remake/minimal_synthetic/
+      input_rgb.png
+      input_depth_raw_mm.png
+      input_mask.png
+      input_relative_depth_u16.png
+      remake_depth_mm.png
+      remake_depth_vis.png
+      summary.json
 
-tools/
-  repro/transparent/remake/run_remake_minimal.py
+  复现/tools/remake/run_remake_minimal.py
 
-docs/
-  复现/透明物体/ReMake.md
+  复现/ReMake.md
 ```
 
 ## 环境
@@ -88,15 +84,15 @@ timm 1.0.27
 ## 已执行命令
 
 ```bash
-mkdir -p data/external/remake weights/transparent/remake runs/transparent/remake
-git clone https://github.com/ChengYaofeng/ReMake.git data/external/remake/official
+mkdir -p 透明物体/external/remake 透明物体/weights/remake 透明物体/runs/remake
+git clone https://github.com/ChengYaofeng/ReMake.git 透明物体/external/remake/official
 
 conda run -n remake gdown \
   'https://drive.google.com/file/d/1AF9sWyhEoNHnAlJ_y1AXsoxgrXq44333/view?usp=drive_link' \
-  -O weights/transparent/remake/checkpoint.tar
+  -O 透明物体/weights/remake/checkpoint.tar
 
-conda run -n remake python tools/repro/transparent/remake/run_remake_minimal.py \
-  --out-dir runs/transparent/remake/minimal_synthetic
+conda run -n remake python 透明物体/复现/tools/remake/run_remake_minimal.py \
+  --out-dir 透明物体/runs/remake/minimal_synthetic
 ```
 
 输出摘要:
@@ -135,19 +131,19 @@ conda run -n remake python tools/repro/transparent/remake/run_remake_minimal.py 
 本仓库建议放置:
 
 ```text
-data/transparent/transcg/
-weights/transparent/remake/depth_anything_v2_vits.pth
+透明物体/data/transcg/
+透明物体/weights/remake/depth_anything_v2_vits.pth
 ```
 
 下一步如果跑真实 ReMake inference，应把最小脚本扩展为:
 
 ```bash
-conda run -n remake python tools/repro/transparent/remake/run_remake_minimal.py \
-  --rgb data/transparent/transcg/scene21/1/rgb1.png \
-  --depth data/transparent/transcg/scene21/1/depth1.png \
-  --mask data/transparent/transcg/scene21/1/depth1-gt-mask.png \
-  --gt data/transparent/transcg/scene21/1/depth1-gt.png \
-  --out-dir runs/transparent/remake/scene21_1_smoke
+conda run -n remake python 透明物体/复现/tools/remake/run_remake_minimal.py \
+  --rgb 透明物体/data/transcg/scene21/1/rgb1.png \
+  --depth 透明物体/data/transcg/scene21/1/depth1.png \
+  --mask 透明物体/data/transcg/scene21/1/depth1-gt-mask.png \
+  --gt 透明物体/data/transcg/scene21/1/depth1-gt.png \
+  --out-dir 透明物体/runs/remake/scene21_1_smoke
 ```
 
 这条命令仍使用合成/派生 relative depth；若要完全复现论文链路，还要接入 Depth Anything V2 生成 relative depth。
