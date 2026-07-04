@@ -1,193 +1,383 @@
 # Agentic Robot 顶会可复现论文筛选
 
-日期: 2026-07-03  
-范围: 2023-2026 年顶会/强会中的 agentic robot、VLA/机器人基础模型、长程操作、机器人数据 scale、仿真数据生成与可复现 benchmark。  
-筛选原则: 优先 CCF-A 机器学习/视觉会议（ICLR/ICML/NeurIPS/CVPR）和机器人顶会/强会（RSS/CoRL/ICRA/IROS）；主表只放有官方代码、公开数据/公开 benchmark、能在短时间启动复现的工作。  
-术语说明: 这里把用户说的 "Asian tick robot" 按 `Agentic Robot / 具身机器人智能体` 理解，重点是高层语言/视觉推理、低层可执行机器人策略、数据规模化与闭环复现。
+日期: 2026-07-04
+修正对象: 2026-07-03 版过度偏向 VLA / 数据 scale / benchmark, 未贴合 `Agentic Robot` 与 `Goal2Skill` 的真正主线。
+修正目标: 调研与两篇 PDF 相近的 agent + robot 工作, 重点是长程机器人操作中的 planner、executor、verifier/critic、memory、reflection、recovery、programmatic constraints, 而不是训练或雕塑一个新 VLA 模型。
+CCFA 使用说明: 按本地 `ccf-literature-searcher` standard mode 与 `ccf-common` source policy 执行; 使用公开关键词检索, 优先官方论文页、项目页、GitHub、arXiv/OpenReview/CVF/PMLR/IEEE/ACM; MDPI/低质来源不纳入主表; 未复现实验一律写“原文报告”或“待跑”。
 
-## 0. 一页结论
+## 0. 一页修正结论
 
-如果目标是第一时间复现，不建议从真实机器人或闭源大模型系统开始。最稳路线是先跑通三个公开仿真/数据基线，再进入 VLA:
+`Agentic Robot` 和 `Goal2Skill` 的可模仿点不是“再造一个更大的 VLA”, 而是把已有 VLA / diffusion policy / primitive library 放进一个可审计的 agentic harness:
 
-| 顺序 | 推荐入口 | 会议 | 为什么先做 | 复现形态 |
-|---:|---|---|---|---|
-| 1 | [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) | RSS 2023 | 代码、数据、Colab、日志和 checkpoint 都完整，是最低摩擦的 visuomotor policy 基线 | 先跑 PushT / image policy，再迁移到 LIBERO/RoboCasa |
-| 2 | [LIBERO](https://libero-project.github.io/main.html) | NeurIPS 2023 D&B | 语言条件机器人操作 benchmark，后续 OpenVLA/Agentic Robot 都绕不开 | 跑 BC/DP/OpenVLA fine-tune 的小套件 |
-| 3 | [VIMA](https://vimalabs.github.io/) | ICML 2023 | multimodal prompt robot agent，数据、仿真、代码、checkpoint 公开，适合验证语言/图像提示 | 跑 VIMA-Bench 零样本/少样本 generalization |
-| 4 | [Octo](https://octo-models.github.io/) | RSS 2024 | 开源通用机器人策略，模型小于 OpenVLA，基于 Open X-Embodiment | 先做 checkpoint inference，再做小数据微调 |
-| 5 | [OpenVLA](https://openvla.github.io/) | CoRL 2024 | 7B 开源 VLA，是近两年 agentic robot executor 的核心基线 | 先跑 LIBERO/BridgeData eval，再做 LoRA/FT |
-| 6 | [MimicGen](https://mimicgen.github.io/) / [RoboCasa](https://robocasa.ai/) | CoRL 2023 / RSS 2024 | 数据生成和日常厨房任务 scale，适合做自己的数据扩增实验 | 先跑 demo playback/BC，再逐步加数据规模 |
+```text
+instruction
+  -> planner: task decomposition, pre/post-condition, constraints
+  -> executor: OpenVLA / DP / ACT / skill primitive
+  -> verifier / monitor / critic: progress, failure, stuck, unsafe future state
+  -> memory: raw keyframes, working summary, error register
+  -> recovery: retry, adjust-param, rollback, replan
+```
 
-优先复现组合建议:
+因此, 2026-07-03 版中 `OpenVLA / Octo / SpatialVLA / pi0` 等应从“主研究路线”降级为 executor 或 reviewer-threat baseline。真正应该优先调研和复现的是:
 
-| 组合 | 目标 | 最小可行实验 |
-|---|---|---|
-| `LIBERO + Diffusion Policy + OpenVLA` | 复现当前 agentic robot 低层 executor 基线 | 选 LIBERO-Spatial/Goal 各 1-2 个任务，跑 DP 与 OpenVLA-FT |
-| `VIMA + GenSim` | 复现多模态 prompt 与 LLM 生成任务路线 | 跑 VIMA-Bench；用 GenSim 生成/加载 CLIPort 任务 |
-| `MimicGen + RoboCasa/RoboCasa365` | 复现数据 scale 与仿真扩增路线 | 从少量 human demos 生成 synthetic demos，训练 BC/DP |
-| `Octo/OpenVLA + Open X-Embodiment` | 复现通用机器人策略路线 | 先下载 checkpoint 做 inference，再抽 OXE 子集微调 |
-| `UMI/Mobile ALOHA` | 复现真实机器人数据采集路线 | 无硬件先跑公开数据和训练脚本；有硬件再做部署 |
+| 优先级 | 研究路线 | 代表工作 | 为什么贴近两篇 PDF |
+|---|---|---|---|
+| P0 | Planner-Executor-Verifier-Recovery 闭环 | Agentic Robot, Code-as-Monitor, HELM, SV-VLA, CLOVER | 都把错误检测/验证/重规划放进执行环, 直接对应 Agentic Robot 的 SAP |
+| P0 | Memory-aware agentic manipulation | Goal2Skill, RMBench, HELM, RoboCerebra | 都强调长程任务中 history、working memory、error register 不是普通长上下文 |
+| P0 | Programmatic / geometric constraints | ReKep, VoxPoser, Code as Policies, ProgPrompt, MOKA | 可模仿为“LLM/VLM 生成可执行约束/代码/3D value map”, 比端到端模型更可控 |
+| P1 | Reflection / imagined future / self-improvement | Reflective Planning, SOAR, RoboClaw | 对应 Goal2Skill 的 reflection 与 Agentic Robot 的 recovery, 但复现成本更高 |
+| P1 | Agentic task/data generation | GenSim, RoboGen, AutoRT | 不是运行时控制核心, 但能生成长程任务、失败样本和训练数据 |
+| P2 | Pure VLA / model scaling | OpenVLA, Octo, SpatialVLA, Long-VLA, pi0/pi0.5 | 必须作为 executor/baseline/threat, 不建议作为本方向第一贡献 |
 
-## 1. P0: 第一时间可以启动复现
+推荐第一阶段的立项句子:
 
-这些工作满足: 顶会/强会、官方代码、公开数据或公开 benchmark、复现实验入口清楚。
+> 构建一个 model-agnostic agentic robot harness: 在不改动底层 VLA/DP executor 的前提下, 用结构化子目标、显式记忆、可执行几何/语义约束 verifier 和分级 recovery, 提升 LIBERO-Long / RMBench / VLABench 上的长程操作鲁棒性。
 
-| 工作 | 年份/会议 | 方向 | 代码/数据 | 复现难度 | 推荐动作 |
-|---|---|---|---|---:|---|
-| [Diffusion Policy: Visuomotor Policy Learning via Action Diffusion](https://diffusion-policy.cs.columbia.edu/) | RSS 2023 | 扩散式低层 visuomotor policy | [GitHub](https://github.com/real-stanford/diffusion_policy), 官方 data/Colab/checkpoints | 低 | 先复现 PushT 和 image policy，作为所有后续操作策略基线 |
-| [LIBERO: Benchmarking Knowledge Transfer for Lifelong Robot Learning](https://libero-project.github.io/main.html) | NeurIPS 2023 Datasets & Benchmarks | lifelong / language-conditioned manipulation benchmark | [GitHub](https://github.com/Lifelong-Robot-Learning/LIBERO), demos/tasks | 低-中 | 先跑 LIBERO-Spatial 或 LIBERO-Goal 小套件 |
-| [VIMA: General Robot Manipulation with Multimodal Prompts](https://vimalabs.github.io/) | ICML 2023 | 多模态 prompt robot agent | [GitHub](https://github.com/vimalabs/VIMA), VIMA-Bench, expert trajectories, checkpoints | 中 | 跑官方 eval，重点看 prompt 形式和泛化协议 |
-| [MimicGen](https://mimicgen.github.io/) | CoRL 2023 | 从少量 human demos 自动生成大规模机器人数据 | [GitHub](https://github.com/NVlabs/mimicgen), [HF datasets](https://huggingface.co/datasets/amandlek/mimicgen_datasets) | 中 | 先跑官方 demo generation，再训练 robomimic BC |
-| [GenSim: Generating Robotic Simulation Tasks via LLMs](https://liruiw.github.io/gensim) | ICLR 2024 Spotlight | LLM 生成仿真任务和 expert goals | [GitHub](https://github.com/liruiw/GenSim), demo/dataset/model links | 中 | 先复现已有 generated tasks，暂时不要一开始接真实机器人 |
-| [Open X-Embodiment: Robotic Learning Datasets and RT-X Models](https://robotics-transformer-x.github.io/) | ICRA 2024 | 多机器人、多任务真实操作数据与 RT-X 模型 | [GitHub](https://github.com/google-deepmind/open_x_embodiment), RLDS/OXE 数据 | 中-高 | 先只下载一个 OXE 子数据集，验证 RLDS pipeline |
-| [Octo: An Open-Source Generalist Robot Policy](https://octo-models.github.io/) | RSS 2024 | 开源通用机器人策略 | [GitHub](https://github.com/octo-models/octo), HF checkpoints, OXE 数据 | 中 | 先跑 checkpoint inference；再选 OXE/Bridge 子集 fine-tune |
-| [OpenVLA: An Open-Source Vision-Language-Action Model](https://openvla.github.io/) | CoRL 2024 | 7B VLA, language-conditioned robot action | [GitHub](https://github.com/openvla/openvla), [HF weights](https://huggingface.co/openvla/openvla-7b), OXE | 中-高 | 先复现 LIBERO/Bridge eval，再考虑 LoRA |
-| [DROID](https://droid-dataset.github.io/) | RSS 2024 | 大规模真实世界机器人操作数据集 | [platform code](https://github.com/droid-dataset/droid), [policy learning](https://github.com/droid-dataset/droid_policy_learning), dataset visualizer/Colab | 中-高 | 先做数据读取和小规模 policy learning，不要先全量训练 |
-| [RoboCasa](https://robocasa.ai/) | RSS 2024 | 厨房日常任务仿真与数据 scale | [GitHub](https://github.com/robocasa/robocasa), demos/assets/tasks | 中 | 先跑 demo playback 和 1-2 个 task 的 BC/DP |
-| [UMI: Universal Manipulation Interface](https://umi-gripper.github.io/) | RSS 2024 | in-the-wild human demo 到机器人策略 | [GitHub](https://github.com/real-stanford/universal_manipulation_interface), [UMI data community](https://umi-data.github.io/) | 中-高 | 无硬件先跑公开 cup dataset 和 SLAM pipeline |
-| [ManiSkill-HAB](https://arth-shukla.github.io/mshab/) | ICLR 2025 | GPU 加速家庭重排/低层操作 benchmark | [GitHub](https://github.com/arth-shukla/mshab), HF models/datasets | 中 | 先跑 single subtask，不先下载全量 490GB |
-| [MimicLabs / What Matters in Learning from Large-Scale Datasets](https://robo-mimiclabs.github.io/) | ICLR 2025 | 数据组成、检索与 scale 规律 | [GitHub](https://github.com/Gatech-RL2/mimiclabs), [HF data](https://huggingface.co/datasets/vaibhavsaxena11/mimiclabs_datasets) | 中 | 复现 camera pose / spatial arrangement 的小规模数据组合实验 |
-| [RoboCasa365](https://robocasa.ai/) | ICLR 2026 | 365 任务、2500 厨房环境、通用机器人 benchmark | [GitHub release](https://github.com/robocasa/robocasa), demos/assets/leaderboard | 中-高 | 只抽 5-10 个任务做 sanity check；全量用于后续 |
+最小可行复现路线:
 
-## 2. P1: 高价值但复现门槛更高
+| 阶段 | 目标 | 最小实验 | 成败门槛 |
+|---|---|---|---|
+| Week 1 | 复现 executor 与环境 | LIBERO-Long 小任务 + OpenVLA/DP baseline | 能稳定跑 rollout, 不追全套 SOTA |
+| Week 2 | Agentic Robot-style SAP | planner 分解 + verifier gate + retry/replan | 相比裸 executor, 长程错误级联减少 |
+| Week 3 | Goal2Skill-style memory | RMBench 2-3 个 memory task + raw keyframe memory + error register | memory ablation 有方向性收益 |
+| Week 4 | 可模仿创新点 | 加入 Code-as-Monitor/ReKep 式约束 verifier 或 geometry-aware monitor | 证明不是单纯多调 VLM, 而是约束/记忆/恢复机制有效 |
 
-这些工作也有代码或数据，但存在算力、硬件、API、环境复杂度等门槛。适合在 P0 跑通后跟进。
+## 1. 与两篇 PDF 的目标对齐
 
-| 工作 | 年份/会议 | 方向 | 开源状态 | 主要门槛 | 建议 |
+### 1.1 两篇 PDF 的共同贡献边界
+
+| 维度 | Agentic Robot | Goal2Skill | 对本调研的筛选含义 |
+|---|---|---|---|
+| 核心问题 | 长程操作错误积累, 无验证推进 | 记忆依赖、部分可观测、失败恢复 | 筛选长程/闭环/失败恢复论文, 不筛普通 pick-place |
+| 高层系统 | SAP: Planner -> Executor -> Verifier -> Recovery | Dual-system: planner + memory + verifier/reflection + executor | 重点找 planner/harness/monitor/recovery |
+| 低层执行 | OpenVLA executor | VLA / diffusion skill library | VLA 是执行器, 不是主贡献 |
+| 判断信号 | temporal verifier 判定 subgoal 是否完成/卡住 | post-condition verifier + reflection | verifier/critic/failure monitor 是主线 |
+| 记忆 | 相对弱 | episodic history + working memory + error register | 记忆是 Goal2Skill 的核心差异 |
+| 风险 | verifier 标注与泛化不足 | 代码/细节不足, 需自搭 | 找可开源补位论文和 benchmark |
+
+### 1.2 需要从 2026-07-03 版删除的隐含假设
+
+- 错误假设 1: “Agentic Robot = VLA 论文筛选”。
+  修正: Agentic Robot 是 VLA 外部的 agentic coordination protocol。
+
+- 错误假设 2: “复现优先级按模型/数据规模排序”。
+  修正: 复现优先级应按 harness 是否可拆、verifier 是否可训、memory/recovery 是否可消融排序。
+
+- 错误假设 3: “顶会可复现 = 只收 NeurIPS/ICML/ICLR/CVPR”。
+  修正: CCF-A 视角下 CVPR/ICCV/NeurIPS/ICML/ICLR 是 A 类; RSS/CoRL/ICRA/IROS 是机器人顶会/强会, 不能冒充 CCF-A, 但在 robot manipulation 方向必须纳入。
+
+## 2. 主表: Agentic Robot / Goal2Skill 近邻论文
+
+评分说明: `Insight / Complete / Evidence` 为 1-5 的文献质量与可审计性粗评, 不是接收概率。`Evidence=N/A benchmark` 表示基准论文不按方法数值评分。
+
+| # | 工作 | 年份/来源 | 类型 | 代码/数据 | Agentic 机制 | Insight | Complete | Evidence | 本方向用途 |
+|---:|---|---|---|---|---|---:|---:|---:|---|
+| 1 | [Agentic Robot](https://arxiv.org/abs/2505.23450) / [project](https://agentic-robot.github.io/) / [code](https://github.com/Agentic-Robot/agentic-robot) | 2025 arXiv | pure method/system | GitHub 可见 | SAP: planner-executor-verifier-recovery | 4 | 3 | 4 | P0 主复现; LIBERO-Long 闭环模板 |
+| 2 | [Goal2Skill](https://arxiv.org/abs/2604.13942) | 2026 arXiv | pure method | 未找到明确官方代码 | memory + adaptive planning + reflection | 4 | 2 | 3 | P0/P1 仿框架; RMBench memory/recovery 模板 |
+| 3 | [Code-as-Monitor](https://zhoues.github.io/Code-as-Monitor/) / [CVF PDF](https://openaccess.thecvf.com/content/CVPR2025/papers/Zhou_Code-as-Monitor_Constraint-aware_Visual_Programming_for_Reactive_and_Proactive_Robotic_Failure_CVPR_2025_paper.pdf) | CVPR 2025 | pure method | 项目页/论文; 代码入口需核查 | VLM 生成监控代码, reactive + proactive failure detection | 5 | 4 | 4 | P0 verifier/monitor 强近邻; 可替代简单 yes/no VLM verifier |
+| 4 | [HELM](https://arxiv.org/abs/2604.18791) | 2026 arXiv | method + protocol | 未找到官方代码 | episodic memory + learned state verifier + rollback/replan | 4 | 3 | 4 | P0 机制威胁; 与 Goal2Skill/Agentic Robot 直接撞线 |
+| 5 | [Reflective Planning](https://reflect-vlm.github.io/) / [code](https://github.com/yunhaif/reflect-vlm) | 2025 arXiv | method + benchmark | code, models, dataset 可见 | diffusion future imagination + VLM reflection | 4 | 4 | 4 | P0/P1 reflection baseline; 可复现实验入口清楚 |
+| 6 | [CLOVER](https://proceedings.neurips.cc/paper_files/paper/2024/hash/fad8962279154544ed69bb63eb14d677-Abstract-Conference.html) / [code](https://github.com/OpenDriveLab/CLOVER) | NeurIPS 2024 | pure method | code/checkpoints 可见 | visual plan + feedback error + replan | 4 | 4 | 4 | P0 闭环视觉控制强基线; CCF-A |
+| 7 | [SV-VLA](https://arxiv.org/abs/2604.02965) / [code](https://github.com/edsad122/SV-VLA) | 2026 arXiv | pure method | code 可见 | heavy VLA macro-planner + lightweight online verifier | 4 | 3 | 3 | P0 效率/鲁棒 verifier 路线; 与 SAP verifier 对齐 |
+| 8 | [ReKep](https://rekep-robot.github.io/) / [PMLR](https://proceedings.mlr.press/v270/huang25g.html) / [code](https://github.com/huangwl18/ReKep) | CoRL 2024 | pure method | demo code 可见 | VLM/large vision model 生成 3D relational keypoint constraints | 5 | 4 | 4 | P0 几何/约束 planner 模板; 适合与 MDE/深度结合 |
+| 9 | [VoxPoser](https://voxposer.github.io/) / [OpenReview](https://openreview.net/forum?id=9_8LF30mOC) / [code](https://github.com/huangwl18/VoxPoser) | CoRL 2023 | pure method | demo code 可见 | LLM/VLM 生成 3D value maps 供 motion planner 使用 | 5 | 4 | 4 | P0 几何 grounding 先驱; ReKep 前身 |
+| 10 | [MOKA](https://moka-manipulation.github.io/) / [RSS page](https://roboticsconference.org/2024/program/papers/62/) / [code](https://github.com/moka-manipulation/moka) | RSS 2024 | pure method | code 可见 | mark-based keypoint affordance, VLM-to-action bridge | 4 | 4 | 4 | P1 open-world affordance front-end; 可服务 verifier/skill parameter |
+| 11 | [SayCan](https://say-can.github.io/) / [arXiv](https://arxiv.org/abs/2204.01691) | CoRL 2022 | pure method | 项目页; 完整机器人栈不全 | LLM planning score + skill affordance/value score | 5 | 3 | 4 | P1 planner-executor 解耦祖先; 不是现代 verifier loop |
+| 12 | [Inner Monologue](https://proceedings.mlr.press/v205/huang23c.html) / [project](https://innermonologue.github.io/) | CoRL 2022 | pure method | 项目页 | environment feedback 写回语言上下文 | 4 | 3 | 4 | P1 feedback/replanning 祖先; 适合 related work |
+| 13 | [ProgPrompt](https://progprompt.github.io/) / [arXiv](https://arxiv.org/abs/2209.11302) | ICRA 2023 | pure method | 项目/代码线索可见 | program-like prompt, precondition/assertion, situated planning | 4 | 3 | 3 | P1 typed subgoal / precondition 表达参考 |
+| 14 | [Code as Policies](https://code-as-policies.github.io/) / [IEEE](https://ieeexplore.ieee.org/document/10160591/) | ICRA 2023 | pure method | project/colab | LLM 生成可执行 robot policy code | 4 | 3 | 3 | P1 programmatic executor/planner 参考 |
+| 15 | [Instruct2Act](https://arxiv.org/abs/2305.11176) / [code](https://github.com/OpenGVLab/Instruct2Act) | 2023 arXiv/OpenReview | pure method | code 可见 | LLM 生成 perception-planning-action Python loop | 3 | 3 | 3 | P1 可复现 agent loop; 非顶会主证据 |
+| 16 | [DoReMi](https://arxiv.org/abs/2307.00329) / [project](https://sites.google.com/view/doremi-paper) | IROS 2024 | pure method | 项目页; 代码未确认 | LLM 生成约束, VLM 连续检测 plan-execution misalignment | 4 | 3 | 3 | P1 recovery 近邻; 与 Code-as-Monitor/Agentic Robot 对比 |
+| 17 | [CoPAL](https://arxiv.org/abs/2310.07263) | ICRA 2024 | pure method | 代码需核查 | reasoning/planning/motion 多层反馈与 corrective replanning | 3 | 3 | 3 | P1 corrective planning 相关工作 |
+| 18 | [VIMA](https://vimalabs.github.io/) / [PMLR PDF](https://proceedings.mlr.press/v202/jiang23b/jiang23b.pdf) / [code](https://github.com/vimalabs/VIMA) | ICML 2023 | method + benchmark | code/benchmark/data 可见 | multimodal prompts unify task specs | 4 | 5 | 4 | P1 prompt/benchmark 参考; CCF-A |
+| 19 | [GenSim](https://openreview.net/forum?id=OI3RoHoWAN) / [code](https://github.com/liruiw/GenSim) | ICLR 2024 Spotlight | system/tool | code 可见 | LLM 生成 simulation tasks, goals, curricula, demonstrations | 4 | 4 | 4 | P1 生成长程任务/失败数据; CCF-A |
+| 20 | [RoboGen](https://proceedings.mlr.press/v235/wang24cc.html) / [project](https://robogen-ai.github.io/) / [code](https://github.com/Genesis-Embodied-AI/RoboGen) | ICML 2024 | system/tool | code 可见 | propose-generate-learn 自引导技能学习循环 | 4 | 4 | 4 | P1 自动任务/技能生成; CCF-A |
+| 21 | [SOAR](https://proceedings.mlr.press/v270/zhou25b.html) / [project](https://auto-improvement.github.io/) / [code](https://github.com/rail-berkeley/soar) | CoRL 2024 | system + dataset | code/data 可见 | VLM task proposal + success detection + autonomous data loop | 4 | 4 | 4 | P1 自改进与自动数据收集 |
+| 22 | [RoboClaw](https://arxiv.org/abs/2603.11558) / [project](https://roboclaw-agibot.github.io/) / [code](https://github.com/RoboClaw-Robotics/RoboClaw) | 2026 arXiv | system | code 可见 | 同一 VLM agent 贯穿 data collection, policy learning, deployment | 4 | 3 | 3 | P1/P2 最新 agentic lifecycle 近邻 |
+| 23 | [Critic in the Loop](https://arxiv.org/abs/2603.05185) | 2026 arXiv | pure method | 代码未确认 | VLM brain + VLA cerebellum + lightweight visual critic | 4 | 2 | 3 | P2 概念近邻; 代码/评测需核查 |
+| 24 | [AutoRT](https://arxiv.org/abs/2401.12963) / [project](https://auto-rt.github.io/) | 2024 arXiv/OpenReview | system | 官方代码未确认 | VLM/LLM orchestrate robot fleet data collection and safety | 4 | 3 | 4 | P2 大规模 agent orchestration 背景 |
+
+## 3. Benchmark / 数据集表
+
+| Benchmark | 年份/来源 | 代码/数据 | 任务属性 | 与两篇 PDF 的关系 | 使用建议 |
 |---|---|---|---|---|---|
-| [RVT: Robotic View Transformer](https://robotic-view-transformer.github.io/) | CoRL 2023 | 多视角 3D manipulation transformer | [GitHub](https://github.com/NVlabs/RVT), RLBench | 全量 18 RLBench tasks 训练较重 | 先复现 1-3 个 RLBench task |
-| [ACT / ALOHA](https://tonyzhaozh.github.io/aloha/) | RSS 2023 | action chunking + 低成本双臂操作 | [GitHub](https://github.com/tonyzhaozh/aloha), hardware/tutorial/data links | 真实硬件和相机标定较重 | 无硬件先复现 ACT training；作为 DP 之外的传统强基线 |
-| [3D Diffuser Actor](https://3d-diffuser-actor.github.io/) | CoRL 2024 | 3D scene token + diffusion policy | [GitHub](https://github.com/nickgkan/3d_diffuser_actor), [HF checkpoints](https://huggingface.co/katefgroup/3d_diffuser_actor), RLBench/CALVIN | RLBench/CALVIN 环境和训练时间 | 适合作为 3D/深度几何方向强基线 |
-| [Mobile ALOHA](https://mobile-aloha.github.io/) | CoRL 2024 | 低成本双臂移动操作 | [GitHub](https://github.com/MarkFzp/mobile-aloha), TFDS `aloha_mobile` | 真实硬件复现重；数据约数十 GB | 无硬件先复现 ACT training；有硬件再部署 |
-| [MOKA](https://moka-manipulation.github.io/) | RSS 2024 | VLM + mark-based visual prompting 开放词汇操作 | [GitHub](https://github.com/moka-manipulation/moka) | GPT-4V/API 与真实/仿真执行栈 | 可作为 agentic perception/affordance baseline |
-| [Eureka](https://eureka-research.github.io/) | ICLR 2024 | LLM 生成奖励函数，强化学习机器人技能 | [GitHub](https://github.com/eureka-research/Eureka), Isaac Gym tasks | 依赖 LLM API 与 GPU RL | 更适合 reward/skill 自动发现方向 |
-| [BEHAVIOR-1K](https://behavior.stanford.edu/index.html) | CoRL 2022, 2024+ 持续更新 | 长程家庭任务 benchmark | [GitHub](https://github.com/StanfordVL/BEHAVIOR-1K), OmniGibson/assets | Omniverse/资产/长程任务复杂 | 用作长程 agentic stress test，不建议第一天开始 |
-| [VoxPoser](https://voxposer.github.io/) | CoRL 2023 | LLM/VLM 生成 3D value maps | [GitHub](https://github.com/huangwl18/VoxPoser) | 依赖 VLM/LLM 和 3D perception stack | 适合和 MDE/深度几何信号结合 |
-| [Code as Policies](https://code-as-policies.github.io/) | ICRA 2023 | LLM 生成可执行机器人 policy code | 项目页/代码公开 | API 与机器人 primitive API 适配 | 适合做 agentic 高层程序控制 baseline |
+| [LIBERO](https://libero-project.github.io/main.html) / [code](https://github.com/Lifelong-Robot-Learning/LIBERO) | NeurIPS 2023 Datasets & Benchmarks | GitHub/demos | language-conditioned manipulation, Spatial/Object/Goal/Long | Agentic Robot 主评测 | P0; 先跑 LIBERO-Long 2-4 个任务 |
+| [RMBench](https://rmbench.github.io/) / [code](https://github.com/robotwin-Platform/rmbench) | 2026 arXiv | GitHub | memory-dependent manipulation, 9 tasks | Goal2Skill 主评测 | P0/P1; memory/recovery 必跑 |
+| [VLABench](https://vlabench.github.io/) / [code](https://github.com/OpenMOSS/VLABench) | ICCV 2025 | GitHub | 100 task categories, long-horizon reasoning, VLA/VLM/workflow eval | 可测 agent workflow 而非只测 VLA | P1; 做泛化/隐式意图压力测试 |
+| [RoboCerebra](https://arxiv.org/html/2506.06677v1) / [code](https://github.com/buaa-colalab/RoboCerebra) | NeurIPS 2025 D&B | GitHub | System-2 long-horizon robotic manipulation benchmark | 检验 planning, reflection, memory | P1/P2; 适合后续 agentic reasoning benchmark |
+| [BEHAVIOR-1K](https://proceedings.mlr.press/v205/li23a.html) / [code](https://github.com/StanfordVL/BEHAVIOR-1K) | CoRL 2022 | GitHub/assets | 1000 everyday household activities, mobile manipulation | 更真实但复现重 | P2; 不建议第一阶段主跑 |
+| [CALVIN](http://calvin.cs.uni-freiburg.de/) | 常用长程 manipulation benchmark | code/data 可见 | multi-step language-conditioned manipulation | CLOVER/HELM 等会用 | P1; 作为 LIBERO 外验证 |
+| [VIMA-Bench](https://github.com/vimalabs/VIMABench) | ICML 2023 | code/data | multimodal prompt task suite | prompt generalization 参考 | P2; 适合 prompt-agent 消融 |
 
-## 3. P2: 新但不建议立刻作为主复现
+协议注意:
 
-这些工作很重要，但存在代码缺失、权重/数据不完整、或完整复现成本过高的问题。可以写 related work，不建议压成第一轮实验主线。
+- LIBERO-Long 和 RMBench 的优势才是本方向证据; 单步 pick/place 不足以支撑 agentic robot claim。
+- RMBench 必须区分 M(1) 与 M(n); Goal2Skill 的收益主要来自 memory-dependent setting。
+- VLABench/RoboCerebra 更像“能不能做 System-2/agent workflow”的新压力测试, 不适合作为第一周起跑。
 
-| 工作 | 年份/会议 | 原因 | 当前处理 |
-|---|---|---|---|
-| [CoT-VLA](https://cot-vla.github.io/) | CVPR 2025 | 项目页和论文公开，但未看到明确官方代码入口 | 作为 reasoning VLA 相关工作引用，暂不做主复现 |
-| [SPEAR-1](https://spear.insait.ai/) | CVPR 2026 | 模型权重/3D 数据公开信号强，但完整训练/评测代码链路仍需核查 | 作为 3D-aware VLA 新威胁关注 |
-| [pi0 / openpi](https://github.com/Physical-Intelligence/openpi) | 2024-2025 技术报告/开源仓库 | 代码和权重已开放，但原始大规模训练数据不完全公开，非顶会主论文 | 可做强工程 baseline，不放顶会主筛选表 |
-| RT-2 / PaLM-E / RoboCat | CoRL/ICML 等 | 影响力高，但权重、训练数据、机器人栈闭源或不完整 | 只在 related work 讨论，不投入第一轮复现 |
-| Dobb-E | arXiv 2023 | 数据/代码/硬件设计开放，但未确认顶会正式论文 | 家庭机器人方向可关注，不作为“顶会筛选”主项 |
+## 4. Closest-work clusters
 
-## 4. 按研究路线分组
+### 4.1 闭环验证与恢复
 
-### 4.1 VLA / 通用机器人策略
+代表工作: Agentic Robot, Code-as-Monitor, HELM, SV-VLA, DoReMi, CoPAL, Critic in the Loop, CLOVER.
 
-| 工作 | 关键问题 | 数据规模 | 适合复现什么 |
-|---|---|---:|---|
-| Open X-Embodiment / RT-X | 多机器人、多任务数据统一格式能否带来跨 embodiment 迁移 | 1M+ real robot trajectories, 22 robot embodiments（项目页口径） | 数据下载、RLDS 格式、跨数据集训练 |
-| Octo | 小得多的 open-source generalist policy 能否快速 fine-tune | 800k OXE episodes | inference、few-hour fine-tune、goal image/language conditioning |
-| OpenVLA | 7B VLA 是否能成为通用 executor | 970k OXE episodes | LIBERO/BridgeData eval、LoRA/FT |
-| CrossFormer / cross-embodiment learning | navigation + manipulation 等异构数据是否能共训 | 900k trajectories, 20 embodiments（PMLR 口径） | 先作为文献威胁，代码数据链路需再核查 |
+已经覆盖:
 
-优先级: `Octo -> OpenVLA -> OXE 子集训练`。OpenVLA 更接近 agentic robot executor，但 Octo 更容易在一般 GPU 上快速迭代。
+- planner/executor 解耦已不是新颖点。
+- “VLM 看图判断成功/失败”也不是新颖点。
+- 2025-2026 近邻已经把 verifier/critic 放入长程 loop, 并开始强调 proactive failure detection、rollback、dynamic routing。
 
-### 4.2 语言/多模态 prompt 与 agentic 规划
+仍然开放:
 
-| 工作 | 关键问题 | 复现入口 | 注意点 |
-|---|---|---|---|
-| VIMA | 文本、图像、视频提示能否统一成 robot prompt | VIMA-Bench + 官方代码 | 完全在仿真里跑，适合第一轮验证 prompt 泛化 |
-| GenSim | LLM 能否生成仿真任务、expert goals 和课程 | CLIPort-style env + 官方 generated tasks | 新任务生成依赖 LLM，先用公开任务复现 |
-| MOKA | VLM 能否用标注点/网格做开放词汇 affordance | 官方 demo code | 依赖 VLM API，不适合作为无 API 的硬复现 |
-| VoxPoser | LLM/VLM 能否生成 3D value maps 做轨迹规划 | 官方 demo code | 是 MDE/深度几何结合点 |
+- verifier 如何从 `yes/no` 变成可执行约束、可解释失败类型和恢复动作选择。
+- verifier 如何利用几何/深度/3D keypoint, 而不只是 RGB VQA。
+- recovery 不能只有 retry/lift gripper; 需要 typed recovery, 如 rollback, adjust-parameter, re-segment, re-grasp, replan。
 
-优先级: `VIMA + GenSim` 先跑纯仿真，MOKA/VoxPoser 作为后续几何/感知增强路线。
+可做路线:
 
-### 4.3 数据 scale / 数据生成 / benchmark
+- 用 Code-as-Monitor/ReKep 式约束作为 Agentic Robot 的 verifier, 替换简单 VLM binary verifier。
+- 把 Goal2Skill 的 `error register` 与 verifier 输出绑定, 让失败类型驱动恢复策略。
+- 做 proactive monitor: 在子任务执行前判定潜在失败, 而不是失败后再问 VLM。
 
-| 工作 | 关键问题 | 数据/环境 | 推荐理由 |
-|---|---|---|---|
-| MimicGen | 少量 human demos 能否自动扩成高质量数据 | 48k+ released demos, robosuite/robomimic | 直接服务“数据不够”的问题 |
-| DROID | 大规模 in-the-wild 真实操作数据是否提升泛化 | 76k demos / 350h / 数百 scenes | 真实数据 scale 主基准 |
-| UMI | 不用真实机器人采集 in-the-wild 演示，能否迁移到机器人 | GoPro + hand-held gripper 数据 | 数据采集系统本身很值得复现 |
-| RoboCasa / RoboCasa365 | 真实感厨房仿真 + LLM/generative assets 能否 scale | 100 -> 365 tasks, human + synthetic demos | 与长程家庭操作和 agentic benchmark 很贴近 |
-| ManiSkill-HAB | GPU 加速低层家庭重排是否能高效 benchmark | TidyHouse/PrepareGroceries/SetTable 数据 | 适合做可控、快速、长程 stress test |
-| MimicLabs | 哪些数据维度真正影响泛化 | controlled data generation | 对后续写“为什么收这种数据”有直接价值 |
+### 4.2 程序化规划与几何约束
 
-优先级: 如果已有机器人学习代码基础，先跑 `MimicGen`; 如果想做 household agent，先跑 `RoboCasa`; 如果关注真实数据泛化，先跑 `DROID/UMI`。
+代表工作: SayCan, Inner Monologue, ProgPrompt, Code as Policies, Instruct2Act, VoxPoser, ReKep, MOKA.
 
-### 4.4 3D/深度几何操作策略
+已经覆盖:
 
-| 工作 | 关键问题 | 公开资源 | 与 MDE 的交叉 |
-|---|---|---|---|
-| RVT | 多视角 re-render + transformer 是否比 voxel 更高效 | code + RLBench | 可用深度/多视角几何做输入增强 |
-| 3D Diffuser Actor | diffusion action policy 是否能从 3D scene tokens 获益 | code + checkpoints + RLBench/CALVIN | 直接连接深度、点云、3D token 表示 |
-| SPEAR-1 | 3D-aware VLM 是否能减少机器人数据需求 | weights / 3D-annotated data | 是 2026 年 3D-aware VLA 方向强威胁 |
-| VoxPoser | 3D value map 是否能作为显式空间约束 | demo code | 可把 MDE 作为 value-map/constraint 输入 |
+- LLM 选 skill / 写代码 / 生成 task plan 已有充分先例。
+- 3D value maps、relational keypoint constraints、mark-based keypoints 都已经证明 “LLM/VLM -> 可执行空间表示” 是可行路线。
 
-优先级: `RVT/3D Diffuser Actor` 比 `SPEAR-1` 更适合立刻动手，因为代码、benchmark 和复现协议更明确。
+仍然开放:
 
-## 5. 推荐复现路线
+- 这些方法多半关注 single task 或 open-set instruction, 对长程 memory/recovery 的系统评测不足。
+- constraint planner 与 VLA executor 的接口还不统一: subgoal 是语言、代码、keypoint cost, 还是 post-condition?
+- MDE/深度信号如何成为 verifier/constraint 的 first-class input, 仍有空间。
 
-### 5.1 3 天快速起跑
+可做路线:
 
-| 天数 | 目标 | 产物 |
-|---:|---|---|
-| Day 1 | 跑通 Diffusion Policy 官方 demo 和一个视觉任务 | 环境可用、日志、checkpoint eval 截图/数值 |
-| Day 2 | 安装 LIBERO，跑一个 task suite 的数据加载和 baseline | 成功加载 demos，跑出最小 rollout |
-| Day 3 | 跑 VIMA 或 GenSim 中一个官方任务 | 多模态 prompt 或 generated task pipeline 可用 |
+- 采用 Goal2Skill 的 structured subtask tuple: `instruction, precondition, postcondition, constraint, horizon, recovery`.
+- 让 ReKep/VoxPoser/MOKA 产生子任务级几何约束, 再用 OpenVLA/DP 执行。
+- 把几何约束同时用于 pre-execution feasibility check 和 post-execution verification。
 
-### 5.2 2 周 P0 路线
+### 4.3 记忆与长程上下文
 
-| 阶段 | 目标 | 验收标准 |
+代表工作: Goal2Skill, HELM, RMBench, RoboCerebra, VLABench, Agentic Robot.
+
+已经覆盖:
+
+- “拉长上下文”不是充分解法。HELM 明确把 memory gap、verification gap、recovery gap 分开讨论。
+- RMBench 已把 memory-dependent manipulation 单独做成评测。
+
+仍然开放:
+
+- working summary 可能丢细节; Goal2Skill 原文 ablation 显示 raw history 很关键。
+- memory 应该服务 planner、verifier 还是 recovery, 需要消融拆开。
+- 失败记忆如何跨 episode 使用仍不清楚。
+
+可做路线:
+
+- 最小记忆设计: raw keyframes + object-state table + error register。
+- 消融: no memory / raw keyframes only / summary only / raw + summary / raw + error register。
+- 指标: success rate, recovery success, verifier false positive/false negative, replan count, failed subgoal cascade length。
+
+### 4.4 自动数据、任务与自改进
+
+代表工作: GenSim, RoboGen, SOAR, AutoRT, RoboClaw.
+
+已经覆盖:
+
+- LLM 生成任务/仿真代码/训练监督已有 CCF-A 论文。
+- VLM 作为 task proposer 与 success detector 已被 SOAR/AutoRT 使用。
+
+仍然开放:
+
+- 生成数据和运行时 agentic control 的连接不够紧。
+- failure/recovery 数据集仍少, verifier 训练数据通常是瓶颈。
+
+可做路线:
+
+- 用 GenSim/RoboGen 生成 long-horizon task variants 和 failure cases。
+- 用 Agentic Robot / Goal2Skill harness 采集 verifier/recovery 标注。
+- 把失败片段做成 `LIBERO-Recovery` 风格 perturbation protocol。
+
+## 5. 推荐复现与研究方案
+
+### 5.1 先复现的系统骨架
+
+```text
+State:
+  observation: RGB/RGB-D frames
+  task_memory: raw keyframes + object state + subgoal history
+  error_register: failed subgoal, failure type, attempted recovery
+
+Planner:
+  input: instruction + observation summary + task_memory + error_register
+  output: typed subgoal tuple
+    - instruction
+    - precondition
+    - postcondition
+    - geometric/semantic constraints
+    - executor hint
+    - max horizon
+    - recovery candidates
+
+Executor:
+  OpenVLA / Diffusion Policy / ACT / scripted primitive
+
+Verifier/Monitor:
+  fast checks: object/keypoint/constraint state
+  VLM checks: subgoal completion, semantic mismatch, stuck
+  memory-conditioned checks: whether current step contradicts prior task context
+
+Recovery:
+  retry
+  adjust parameter
+  rollback to previous safe state
+  re-perceive/re-segment
+  replan from error_register
+```
+
+### 5.2 最小实验矩阵
+
+| Claim | Benchmark | Baselines | Ablations | Metrics |
+|---|---|---|---|---|
+| verifier gate 减少长程级联错误 | LIBERO-Long | OpenVLA/DP, Agentic Robot-style binary verifier | no verifier, VLM yes/no, constraint verifier, constraint+VLM | SR, subgoal SR, false advance rate |
+| structured memory 帮助 memory-dependent manipulation | RMBench | ACT/DP/OpenVLA, Goal2Skill-style planner | no memory, summary, raw keyframes, error register | SR M(1)/M(n), recovery success |
+| geometry-aware monitor 比纯 RGB VLM 更稳 | LIBERO/RMBench hard cases | VLM verifier, Code-as-Monitor-style monitor, ReKep constraint | no depth, RGB constraints, RGB-D constraints | verifier F1, replan precision, latency |
+| recovery policy 不是装饰 | perturbation protocol / LIBERO-Recovery-style | retry only, fixed lift, typed recovery | no recovery, retry, adjust, rollback, replan | recovered SR, extra steps, failure loop count |
+
+### 5.3 复现优先级
+
+| 优先级 | 动作 | 具体论文/组件 |
 |---|---|---|
-| Week 1 | `LIBERO + DP/OpenVLA` 小规模复现 | 2-4 个任务的 success rate 能稳定复跑 |
-| Week 1 | `VIMA` 官方 benchmark 子集 | 复现官方 checkpoint eval 流程 |
-| Week 2 | `Octo` inference/fine-tune | 成功加载 HF checkpoint，并在小数据上 fine-tune |
-| Week 2 | `MimicGen` 数据生成 | 从 source demos 生成新 demos，并训练一个 BC policy |
-| Week 2 | `RoboCasa` 单任务训练/评测 | demo playback + 一个任务 baseline |
+| P0-1 | 跑环境和 executor | LIBERO + DP/OpenVLA |
+| P0-2 | 搭 SAP loop | Agentic Robot 的 planner-executor-verifier-recovery |
+| P0-3 | 加强 verifier | Code-as-Monitor 约束思想 + VLM binary verifier |
+| P0-4 | 加 memory/recovery | Goal2Skill/RMBench + error register |
+| P1-1 | 加几何 planner | ReKep/VoxPoser/MOKA 的 keypoint/value-map/affordance 表示 |
+| P1-2 | 加 reflection | Reflective Planning 或 CLOVER 的 imagined future / visual plan feedback |
+| P2 | 扩 benchmark | VLABench/RoboCerebra/BEHAVIOR-1K |
 
-### 5.3 后续研究切口
+## 6. 与 VLA 论文的正确关系
 
-| 切口 | 可以复用的 P0/P1 工作 | 研究问题 |
+VLA 论文仍然重要, 但位置要改:
+
+| 类别 | 代表 | 在本方向中的位置 |
 |---|---|---|
-| Agentic verifier | LIBERO + OpenVLA + VIMA | verifier 是否能减少长程任务级联错误 |
-| 几何/深度增强 executor | RVT + 3D Diffuser Actor + VoxPoser | 深度/3D token 是否提升遮挡、空间冲突、目标放置 |
-| 数据选择与 scale | MimicGen + MimicLabs + DROID | 什么数据维度最值得收，如何检索最相关 demos |
-| 家庭长程任务 | RoboCasa365 + ManiSkill-HAB + BEHAVIOR-1K | 长程任务中计划、记忆、恢复怎样评测 |
-| 真实数据采集 | UMI + Mobile ALOHA + DROID | 低成本采集能否支撑 VLA fine-tune |
+| executor baseline | OpenVLA, Octo, DP, ACT | 作为低层执行器, 评估 agentic harness 是否提升同一 executor |
+| strong threat | SpatialVLA, TraceVLA, pi0/pi0.5, Long-VLA | 如果它们裸模型已解决长程任务, agentic harness 的必要性会被削弱 |
+| data/model scaling | Open X-Embodiment, DROID, RoboCasa, UMI | 背景/数据源, 不作为第一贡献 |
+| model-sculpting routes | tokenization, phase mask, 3D-aware VLA | 暂不主攻; 除非 harness 路线失败 |
 
-## 6. 不建议第一轮投入的坑
+写作边界:
 
-| 坑 | 原因 | 替代方案 |
-|---|---|---|
-| 一开始复现 RT-2/PaLM-E/RoboCat | 训练数据/权重/机器人栈闭源，不满足可复现筛选 | 用 OpenVLA/Octo |
-| 一开始下载全量 OXE/DROID/RoboCasa365 | 数据巨大，容易先卡在存储和格式转换 | 先抽子集或跑官方 mini demo |
-| 一开始上真实机器人 | 硬件、标定、安全、相机同步会吞掉主要时间 | 先仿真/公开数据跑通算法 |
-| 只跑单步 pick-place | agentic robot 的核心是长程、失败检测、恢复 | 至少包含 LIBERO-Long/RoboCasa/ManiSkill-HAB 子集 |
-| 只比较 VLA，不比较 DP/ACT | reviewer 会质疑强传统策略 baseline 缺失 | Diffusion Policy 和 ACT 至少保留一个 |
+- 可以说: 本工作不追求训练更大的 VLA, 而是研究如何将现有 robot policies 组织成可验证、可恢复、带记忆的 agentic robot system。
+- 不能说: 本工作全面优于 VLA foundation models。
+- 必须报告: 同 executor 下加/不加 harness 的差异, 否则 reviewer 会认为收益来自模型或数据差异。
 
-## 7. 参考链接
+## 7. 最值得模仿的三类设计
 
-- Open X-Embodiment / RT-X: [project](https://robotics-transformer-x.github.io/), [code/data](https://github.com/google-deepmind/open_x_embodiment)
-- Octo: [project](https://octo-models.github.io/), [code](https://github.com/octo-models/octo)
-- OpenVLA: [project](https://openvla.github.io/), [code](https://github.com/openvla/openvla), [weights](https://huggingface.co/openvla/openvla-7b)
-- Diffusion Policy: [project](https://diffusion-policy.cs.columbia.edu/), [code](https://github.com/real-stanford/diffusion_policy)
-- LIBERO: [project](https://libero-project.github.io/main.html), [code](https://github.com/Lifelong-Robot-Learning/LIBERO)
-- VIMA: [project](https://vimalabs.github.io/), [code](https://github.com/vimalabs/VIMA)
-- MimicGen: [project/docs](https://mimicgen.github.io/), [code](https://github.com/NVlabs/mimicgen), [dataset](https://huggingface.co/datasets/amandlek/mimicgen_datasets)
-- GenSim: [project](https://liruiw.github.io/gensim), [code](https://github.com/liruiw/GenSim)
-- DROID: [project](https://droid-dataset.github.io/), [robot platform](https://github.com/droid-dataset/droid), [policy learning](https://github.com/droid-dataset/droid_policy_learning)
-- RoboCasa/RoboCasa365: [project](https://robocasa.ai/), [code](https://github.com/robocasa/robocasa)
-- UMI: [project](https://umi-gripper.github.io/), [code](https://github.com/real-stanford/universal_manipulation_interface), [community data](https://umi-data.github.io/)
-- Mobile ALOHA: [project](https://mobile-aloha.github.io/), [code](https://github.com/MarkFzp/mobile-aloha), [TFDS data](https://www.tensorflow.org/datasets/catalog/aloha_mobile)
-- RVT: [project](https://robotic-view-transformer.github.io/), [code](https://github.com/NVlabs/RVT)
-- 3D Diffuser Actor: [project](https://3d-diffuser-actor.github.io/), [code](https://github.com/nickgkan/3d_diffuser_actor), [checkpoints](https://huggingface.co/katefgroup/3d_diffuser_actor)
-- ManiSkill-HAB: [project](https://arth-shukla.github.io/mshab/), [code](https://github.com/arth-shukla/mshab)
-- MimicLabs: [paper/project](https://robo-mimiclabs.github.io/), [code](https://github.com/Gatech-RL2/mimiclabs), [data](https://huggingface.co/datasets/vaibhavsaxena11/mimiclabs_datasets)
-- ACT / ALOHA: [project](https://tonyzhaozh.github.io/aloha/), [code](https://github.com/tonyzhaozh/aloha)
-- MOKA: [project](https://moka-manipulation.github.io/), [code](https://github.com/moka-manipulation/moka)
-- Eureka: [project](https://eureka-research.github.io/), [code](https://github.com/eureka-research/Eureka)
-- VoxPoser: [project](https://voxposer.github.io/), [code](https://github.com/huangwl18/VoxPoser)
-- Code as Policies: [project](https://code-as-policies.github.io/)
-- BEHAVIOR-1K: [project](https://behavior.stanford.edu/index.html), [code](https://github.com/StanfordVL/BEHAVIOR-1K)
-- CoT-VLA: [project](https://cot-vla.github.io/)
-- SPEAR-1: [project](https://spear.insait.ai/), [CVPR 2026 paper](https://openaccess.thecvf.com/content/CVPR2026/html/Nikolov_SPEAR-1_Scaling_Beyond_Robot_Demonstrations_via_3D_Understanding_CVPR_2026_paper.html)
+### 7.1 Agentic Robot/HELM/Code-as-Monitor 式 verifier 设计
+
+可模仿:
+
+- verifier 输入不只是当前图像, 还包括 subgoal、post-condition、memory、constraints。
+- verifier 输出不只是 yes/no, 而是 `success / still-trying / stuck / semantic-mismatch / unsafe / impossible`。
+- verifier 触发 recovery/replan, 而不是只做离线评价。
+
+需要新增证据:
+
+- verifier false advance rate: 上一步失败却放行下一步的比例。
+- verifier false block rate: 子任务成功却阻塞的比例。
+- recovery precision: 被触发的恢复是否真的提升成功率。
+
+### 7.2 Goal2Skill 式 memory design
+
+可模仿:
+
+- `episodic history`: 保留关键帧和动作结果, 不只保留摘要。
+- `working memory`: 当前任务相关对象、位置、约束、未完成子目标。
+- `error register`: 失败类型、触发条件、恢复动作、是否有效。
+
+需要新增证据:
+
+- raw history vs summary 的消融。
+- memory 参与 planner vs verifier vs recovery 的拆分。
+- memory 错误或过期时的失败分析。
+
+### 7.3 ReKep/VoxPoser/Code-as-Monitor 式约束接口
+
+可模仿:
+
+- 用 LLM/VLM 生成空间约束或监控代码, 让 subgoal 有可执行判据。
+- 约束从语言落到 keypoint/3D value map/constraint element。
+- geometry/depth 信号进入 verifier, 解决“看起来完成但空间上错误”的问题。
+
+需要新增证据:
+
+- RGB-only verifier vs RGB-D/geometric verifier。
+- spatial conflict hard cases, 如相同物体、遮挡、目标放置冲突。
+- constraint 生成错误的失败案例和 fallback。
+
+## 8. 检索记录与来源策略
+
+安全公开检索关键词:
+
+- `agentic robot long-horizon manipulation planner executor verifier recovery`
+- `robot manipulation VLM verifier monitor failure recovery long horizon`
+- `LLM robot task planning code policies constraints keypoint value maps`
+- `memory-dependent robotic manipulation benchmark RMBench Goal2Skill`
+- `closed-loop VLA verifier recovery long-horizon manipulation`
+
+来源策略:
+
+- 主证据使用官方项目页、arXiv/OpenReview/CVF/PMLR/IEEE/GitHub。
+- ResearchGate、博客、awesome list 只作为发现线索, 不作为主证据。
+- MDPI 来源不纳入主表。
+- 会议标注保持诚实: CVPR/ICCV/NeurIPS/ICML/ICLR 归 CCF-A 视角; RSS/CoRL/ICRA/IROS 标为机器人顶会/强会。
+
+主要来源链接:
+
+- Agentic Robot: [arXiv](https://arxiv.org/abs/2505.23450), [project](https://agentic-robot.github.io/), [GitHub](https://github.com/Agentic-Robot/agentic-robot)
+- Goal2Skill: [arXiv](https://arxiv.org/abs/2604.13942)
+- Code-as-Monitor: [project](https://zhoues.github.io/Code-as-Monitor/), [CVF PDF](https://openaccess.thecvf.com/content/CVPR2025/papers/Zhou_Code-as-Monitor_Constraint-aware_Visual_Programming_for_Reactive_and_Proactive_Robotic_Failure_CVPR_2025_paper.pdf)
+- Reflective Planning: [project](https://reflect-vlm.github.io/), [GitHub](https://github.com/yunhaif/reflect-vlm)
+- CLOVER: [NeurIPS](https://proceedings.neurips.cc/paper_files/paper/2024/hash/fad8962279154544ed69bb63eb14d677-Abstract-Conference.html), [GitHub](https://github.com/OpenDriveLab/CLOVER)
+- ReKep: [project](https://rekep-robot.github.io/), [PMLR](https://proceedings.mlr.press/v270/huang25g.html), [GitHub](https://github.com/huangwl18/ReKep)
+- VoxPoser: [project](https://voxposer.github.io/), [OpenReview](https://openreview.net/forum?id=9_8LF30mOC), [GitHub](https://github.com/huangwl18/VoxPoser)
+- SayCan: [project](https://say-can.github.io/), [arXiv](https://arxiv.org/abs/2204.01691)
+- Inner Monologue: [PMLR](https://proceedings.mlr.press/v205/huang23c.html), [project](https://innermonologue.github.io/)
+- Code as Policies: [project](https://code-as-policies.github.io/), [IEEE](https://ieeexplore.ieee.org/document/10160591/)
+- ProgPrompt: [project](https://progprompt.github.io/), [arXiv](https://arxiv.org/abs/2209.11302)
+- MOKA: [project](https://moka-manipulation.github.io/), [RSS](https://roboticsconference.org/2024/program/papers/62/), [GitHub](https://github.com/moka-manipulation/moka)
+- GenSim: [OpenReview](https://openreview.net/forum?id=OI3RoHoWAN), [GitHub](https://github.com/liruiw/GenSim)
+- RoboGen: [PMLR](https://proceedings.mlr.press/v235/wang24cc.html), [project](https://robogen-ai.github.io/), [GitHub](https://github.com/Genesis-Embodied-AI/RoboGen)
+- SOAR: [PMLR](https://proceedings.mlr.press/v270/zhou25b.html), [project](https://auto-improvement.github.io/), [GitHub](https://github.com/rail-berkeley/soar)
+- LIBERO: [project](https://libero-project.github.io/main.html), [GitHub](https://github.com/Lifelong-Robot-Learning/LIBERO)
+- RMBench: [project](https://rmbench.github.io/), [GitHub](https://github.com/robotwin-Platform/rmbench)
+- VLABench: [project](https://vlabench.github.io/), [GitHub](https://github.com/OpenMOSS/VLABench)
+- RoboCerebra: [arXiv HTML](https://arxiv.org/html/2506.06677v1), [GitHub](https://github.com/buaa-colalab/RoboCerebra)
+
+## 9. 当前 go/no-go 判断
+
+GO, 但必须把 claim 收窄到 agentic harness。
+
+可主张:
+
+- 长程机器人操作的主要瓶颈之一是执行环缺少显式记忆、验证和恢复。
+- 在同一 executor 上, 结构化 planner/verifier/memory/recovery 可以减少级联错误。
+- 几何/约束型 verifier 是比普通 VLM yes/no 更强的可研究切口。
+
+不可主张:
+
+- 不要声称提出新 VLA foundation model。
+- 不要声称替代 OpenVLA/pi0/SpatialVLA。
+- 不要只用单步任务或平均 SR 支撑长程 agentic claim。
+
+下一步应做:
+
+1. 先复现 LIBERO-Long 小集 executor baseline。
+2. 用最小 SAP harness 复刻 Agentic Robot 的推进逻辑。
+3. 在 RMBench 上加入 raw memory + error register。
+4. 引入 Code-as-Monitor/ReKep 式约束 verifier, 做 RGB-only vs geometric verifier 消融。

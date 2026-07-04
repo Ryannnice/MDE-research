@@ -28,7 +28,7 @@
 - 两者都证明的是 benchmark-specific SOTA, 不能直接概括为所有机器人操作 SOTA。
 
 
-<img src="Benchmark.png" width="50%">
+<img src="Benchmark.png" width="70%">
 
 ## 1. 两篇 PDF 论文卡
 
@@ -50,6 +50,19 @@
 | 关键风险 | verifier 训练数据规模小且是否公开不明; recovery 策略非常简单; 只在模拟 LIBERO, 无真实机器人 |
 
 Agentic Robot 的主张可以压缩为: OpenVLA 不是替换掉, 而是作为 Executor 被高层 SAP 管起来。SAP 贡献在于让进度推进必须经过 verifier gate, 不允许上一子任务失败后盲目进入下一子任务。
+
+</br>
+<img src="Agentic_Robot_Workflow.png" width="100%">
+</br>
+
+Ground-Action（接地动作）. "Ground"这个动词在 AI 领域有一个专门术语——符号接地问题（Symbol Grounding Problem），指的是：如何把抽象的、离散的语言符号，映射到具体的、连续的物理世界状态。
+
+</br>
+<img src="Agentic_Robot_SAP.png" width="50%">
+</br>
+
+LRM（Large Reasoning Model，大型推理模型）. LRM 与我们常说的"LLM"（Large Language Model，大型语言模型）是什么关系？简单说，LRM 是 LLM 的一个子集/进阶方向——所有 LRM 本质上都是 LLM（都基于 Transformer 架构、都通过预测下一个词元来生成文本），但 LRM 在训练阶段额外引入了强化学习等技术，专门强化模型的"链式思考"（Chain-of-Thought）与多步骤逻辑推导能力，而不仅仅是流畅地生成文本。
+
 
 原文主表:
 
@@ -111,6 +124,23 @@ LIBERO-Long 10 个场景中, 相比 OpenVLA 的总体成功率变化:
 | 关键风险 | 无官方代码; executor/skill library 细节不足; 使用 RMBench 子集而非全量; 很多 baseline 数值取自 RMBench |
 
 Goal2Skill 与 Agentic Robot 的最大差异是“记忆”从辅助上下文升级为一等公民。Agentic Robot 的 verifier 主要决定能不能进入下一步; Goal2Skill 的 planner 会把 episodic history、working summary、error register 都喂回 planner/reflection, 让失败诊断影响后续计划。
+
+
+</br>
+<img src="Goal2skill_workflow.png" width="80%">
+</br>
+
+
+</br>
+<img src="Goal2skill_Method.png" width="90%">
+</br>
+
+
+</br>
+<img src="Goal2skill_Memory.png" width="60%">
+</br>
+
+
 
 原文主表:
 
