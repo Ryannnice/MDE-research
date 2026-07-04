@@ -1,13 +1,6 @@
 # Agentic Robot 顶会可复现论文筛选
 
-日期: 2026-07-04
-修正对象: 2026-07-03 版过度偏向 VLA / 数据 scale / benchmark, 未贴合 `Agentic Robot` 与 `Goal2Skill` 的真正主线。
-修正目标: 调研与两篇 PDF 相近的 agent + robot 工作, 重点是长程机器人操作中的 planner、executor、verifier/critic、memory、reflection、recovery、programmatic constraints, 而不是训练或雕塑一个新 VLA 模型。
-CCFA 使用说明: 按本地 `ccf-literature-searcher` standard mode 与 `ccf-common` source policy 执行; 使用公开关键词检索, 优先官方论文页、项目页、GitHub、arXiv/OpenReview/CVF/PMLR/IEEE/ACM; MDPI/低质来源不纳入主表; 未复现实验一律写“原文报告”或“待跑”。
-
-## 0. 一页修正结论
-
-`Agentic Robot` 和 `Goal2Skill` 的可模仿点不是“再造一个更大的 VLA”, 而是把已有 VLA / diffusion policy / primitive library 放进一个可审计的 agentic harness:
+> 构建一个 model-agnostic agentic robot harness: 在不改动底层 VLA/DP executor 的前提下, 用结构化子目标、显式记忆、可执行几何/语义约束 verifier 和分级 recovery, 提升 LIBERO-Long / RMBench / VLABench 上的长程操作鲁棒性。
 
 ```text
 instruction
@@ -18,20 +11,7 @@ instruction
   -> recovery: retry, adjust-param, rollback, replan
 ```
 
-因此, 2026-07-03 版中 `OpenVLA / Octo / SpatialVLA / pi0` 等应从“主研究路线”降级为 executor 或 reviewer-threat baseline。真正应该优先调研和复现的是:
-
-| 优先级 | 研究路线 | 代表工作 | 为什么贴近两篇 PDF |
-|---|---|---|---|
-| P0 | Planner-Executor-Verifier-Recovery 闭环 | Agentic Robot, Code-as-Monitor, HELM, SV-VLA, CLOVER | 都把错误检测/验证/重规划放进执行环, 直接对应 Agentic Robot 的 SAP |
-| P0 | Memory-aware agentic manipulation | Goal2Skill, RMBench, HELM, RoboCerebra | 都强调长程任务中 history、working memory、error register 不是普通长上下文 |
-| P0 | Programmatic / geometric constraints | ReKep, VoxPoser, Code as Policies, ProgPrompt, MOKA | 可模仿为“LLM/VLM 生成可执行约束/代码/3D value map”, 比端到端模型更可控 |
-| P1 | Reflection / imagined future / self-improvement | Reflective Planning, SOAR, RoboClaw | 对应 Goal2Skill 的 reflection 与 Agentic Robot 的 recovery, 但复现成本更高 |
-| P1 | Agentic task/data generation | GenSim, RoboGen, AutoRT | 不是运行时控制核心, 但能生成长程任务、失败样本和训练数据 |
-| P2 | Pure VLA / model scaling | OpenVLA, Octo, SpatialVLA, Long-VLA, pi0/pi0.5 | 必须作为 executor/baseline/threat, 不建议作为本方向第一贡献 |
-
-推荐第一阶段的立项句子:
-
-> 构建一个 model-agnostic agentic robot harness: 在不改动底层 VLA/DP executor 的前提下, 用结构化子目标、显式记忆、可执行几何/语义约束 verifier 和分级 recovery, 提升 LIBERO-Long / RMBench / VLABench 上的长程操作鲁棒性。
+## 0. 关于复现 Agentic Robot
 
 最小可行复现路线:
 
@@ -42,9 +22,19 @@ instruction
 | Week 3 | Goal2Skill-style memory | RMBench 2-3 个 memory task + raw keyframe memory + error register | memory ablation 有方向性收益 |
 | Week 4 | 可模仿创新点 | 加入 Code-as-Monitor/ReKep 式约束 verifier 或 geometry-aware monitor | 证明不是单纯多调 VLM, 而是约束/记忆/恢复机制有效 |
 
-## 1. 与两篇 PDF 的目标对齐
+| 优先级 | 研究路线 | 代表工作 | 为什么贴近两篇 PDF |
+|---|---|---|---|
+| P0 | Planner-Executor-Verifier-Recovery 闭环 | Agentic Robot, Code-as-Monitor, HELM, SV-VLA, CLOVER | 都把错误检测/验证/重规划放进执行环, 直接对应 Agentic Robot 的 SAP |
+| P0 | Memory-aware agentic manipulation | Goal2Skill, RMBench, HELM, RoboCerebra | 都强调长程任务中 history、working memory、error register 不是普通长上下文 |
+| P0 | Programmatic / geometric constraints | ReKep, VoxPoser, Code as Policies, ProgPrompt, MOKA | 可模仿为“LLM/VLM 生成可执行约束/代码/3D value map”, 比端到端模型更可控 |
+| P1 | Reflection / imagined future / self-improvement | Reflective Planning, SOAR, RoboClaw | 对应 Goal2Skill 的 reflection 与 Agentic Robot 的 recovery, 但复现成本更高 |
+| P1 | Agentic task/data generation | GenSim, RoboGen, AutoRT | 不是运行时控制核心, 但能生成长程任务、失败样本和训练数据 |
+| P2 | Pure VLA / model scaling | OpenVLA, Octo, SpatialVLA, Long-VLA, pi0/pi0.5 | 必须作为 executor/baseline/threat, 不建议作为本方向第一贡献 |
 
-### 1.1 两篇 PDF 的共同贡献边界
+
+
+
+## 1. 两篇 Agentic Robot 工作
 
 | 维度 | Agentic Robot | Goal2Skill | 对本调研的筛选含义 |
 |---|---|---|---|
@@ -55,17 +45,6 @@ instruction
 | 记忆 | 相对弱 | episodic history + working memory + error register | 记忆是 Goal2Skill 的核心差异 |
 | 风险 | verifier 标注与泛化不足 | 代码/细节不足, 需自搭 | 找可开源补位论文和 benchmark |
 
-### 1.2 需要从 2026-07-03 版删除的隐含假设
-
-- 错误假设 1: “Agentic Robot = VLA 论文筛选”。
-  修正: Agentic Robot 是 VLA 外部的 agentic coordination protocol。
-
-- 错误假设 2: “复现优先级按模型/数据规模排序”。
-  修正: 复现优先级应按 harness 是否可拆、verifier 是否可训、memory/recovery 是否可消融排序。
-
-- 错误假设 3: “顶会可复现 = 只收 NeurIPS/ICML/ICLR/CVPR”。
-  修正: CCF-A 视角下 CVPR/ICCV/NeurIPS/ICML/ICLR 是 A 类; RSS/CoRL/ICRA/IROS 是机器人顶会/强会, 不能冒充 CCF-A, 但在 robot manipulation 方向必须纳入。
-
 ## 2. 主表: Agentic Robot / Goal2Skill 近邻论文
 
 评分说明: `Insight / Complete / Evidence` 为 1-5 的文献质量与可审计性粗评, 不是接收概率。`Evidence=N/A benchmark` 表示基准论文不按方法数值评分。
@@ -74,7 +53,7 @@ instruction
 |---:|---|---|---|---|---|---:|---:|---:|---|
 | 1 | [Agentic Robot](https://arxiv.org/abs/2505.23450) / [project](https://agentic-robot.github.io/) / [code](https://github.com/Agentic-Robot/agentic-robot) | 2025 arXiv | pure method/system | GitHub 可见 | SAP: planner-executor-verifier-recovery | 4 | 3 | 4 | P0 主复现; LIBERO-Long 闭环模板 |
 | 2 | [Goal2Skill](https://arxiv.org/abs/2604.13942) | 2026 arXiv | pure method | 未找到明确官方代码 | memory + adaptive planning + reflection | 4 | 2 | 3 | P0/P1 仿框架; RMBench memory/recovery 模板 |
-| 3 | [Code-as-Monitor](https://zhoues.github.io/Code-as-Monitor/) / [CVF PDF](https://openaccess.thecvf.com/content/CVPR2025/papers/Zhou_Code-as-Monitor_Constraint-aware_Visual_Programming_for_Reactive_and_Proactive_Robotic_Failure_CVPR_2025_paper.pdf) | CVPR 2025 | pure method | 项目页/论文; 代码入口需核查 | VLM 生成监控代码, reactive + proactive failure detection | 5 | 4 | 4 | P0 verifier/monitor 强近邻; 可替代简单 yes/no VLM verifier |
+| 3 | [Code-as-Monitor](https://zhoues.github.io/Code-as-Monitor/) / [CVF PDF](https://openaccess.thecvf.com/content/CVPR2025/papers/Zhou_Code-as-Monitor_Constraint-aware_Visual_Programming_for_Reactive_and_Proactive_Robotic_Failure_CVPR_2025_paper.pdf) | CVPR 2025 | pure method | 项目页/论文; 代码入口需核查 | VLM 生成监控代码, reactive + proactive failure detection （Code-as-Monitor统一了被动错误检测（即错误发生后的检测与恢复）与主动错误检测（即预判并防范潜在错误），引入了一种用于表征相关物体及其部件的约束元素，以增强时空约束的实时跟踪与精确计算） | 5 | 4 | 4 | P0 verifier/monitor 强近邻; 可替代简单 yes/no VLM verifier |
 | 4 | [HELM](https://arxiv.org/abs/2604.18791) | 2026 arXiv | method + protocol | 未找到官方代码 | episodic memory + learned state verifier + rollback/replan | 4 | 3 | 4 | P0 机制威胁; 与 Goal2Skill/Agentic Robot 直接撞线 |
 | 5 | [Reflective Planning](https://reflect-vlm.github.io/) / [code](https://github.com/yunhaif/reflect-vlm) | 2025 arXiv | method + benchmark | code, models, dataset 可见 | diffusion future imagination + VLM reflection | 4 | 4 | 4 | P0/P1 reflection baseline; 可复现实验入口清楚 |
 | 6 | [CLOVER](https://proceedings.neurips.cc/paper_files/paper/2024/hash/fad8962279154544ed69bb63eb14d677-Abstract-Conference.html) / [code](https://github.com/OpenDriveLab/CLOVER) | NeurIPS 2024 | pure method | code/checkpoints 可见 | visual plan + feedback error + replan | 4 | 4 | 4 | P0 闭环视觉控制强基线; CCF-A |
