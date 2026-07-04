@@ -1,0 +1,8 @@
+repos/
+data/hf_cache/
+data/libero_datasets/
+data/saved_frames/
+data/rollouts/
+**/__pycache__/
+*.pyc
+*.mp4

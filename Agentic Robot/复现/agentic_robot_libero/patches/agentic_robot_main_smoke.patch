@@ -1,0 +1,57 @@
+diff --git a/experiments/robot/libero/main.py b/experiments/robot/libero/main.py
+index 505db71..742dab3 100644
+--- a/experiments/robot/libero/main.py
++++ b/experiments/robot/libero/main.py
+@@ -39,8 +39,14 @@ from experiments.robot.robot_utils import (
+ )
+ 
+ 
+-from qwenvl import load_qwen_vl_model, check_completion_with_qwen_vl
+-VLM_AVAILABLE = True
++try:
++    from qwenvl import load_qwen_vl_model, check_completion_with_qwen_vl
++    VLM_AVAILABLE = True
++except ImportError as exc:
++    load_qwen_vl_model = None
++    check_completion_with_qwen_vl = None
++    VLM_AVAILABLE = False
++    VLM_IMPORT_ERROR = exc
+ 
+ 
+ @dataclass
+@@ -64,6 +70,9 @@ class GenerateConfig:
+     task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
+     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
+     num_trials_per_task: int = 5                  # Number of rollouts per task (原默认 50)
++    start_task_id: int = 0
++    max_tasks: Optional[int] = None
++    max_steps_override: Optional[int] = None
+ 
+     # #################################################################################################################
+     # # Utils
+@@ -165,7 +174,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
+     # Start evaluation
+     total_episodes, total_successes = 0, 0
+-    for task_id in tqdm.tqdm(range(num_tasks_in_suite), desc="Tasks"):
++    task_end = num_tasks_in_suite if cfg.max_tasks is None else min(num_tasks_in_suite, cfg.start_task_id + cfg.max_tasks)
++    for task_id in tqdm.tqdm(range(cfg.start_task_id, task_end), desc="Tasks"):
+         # Get task
+         task = task_suite.get_task(task_id)
+ 
+@@ -223,6 +233,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+                 max_steps = 400
+             else: # Fallback
+                 max_steps = 400
++            if cfg.max_steps_override is not None:
++                max_steps = cfg.max_steps_override
+ 
+             log_file.write(f"Starting episode run (max_steps={max_steps})...\n")
+             while t < max_steps + cfg.num_steps_wait:
+@@ -455,4 +467,4 @@ if __name__ == "__main__":
+     end_time = time.perf_counter() 
+     duration = end_time - start_time
+     print(f"\n end: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+-    print(f"eval_libero total_time: {duration:.2f} seconds")
+\ No newline at end of file
++    print(f"eval_libero total_time: {duration:.2f} seconds")

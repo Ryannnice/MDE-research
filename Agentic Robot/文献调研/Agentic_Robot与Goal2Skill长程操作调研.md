@@ -7,7 +7,11 @@
 
 ## 0. 一页结论
 
-这两篇 PDF 属于同一条新方向: 不再把 VLA 当作一次性端到端策略, 而是在 VLA 外面包一个高层 agentic 控制环。高层用 LLM/VLM 做任务分解、记忆、验证、反思与重规划; 低层用 VLA 或 diffusion policy 执行可验证的子任务。核心 claim 不是单个 grasp/pick/place 更强, 而是长程任务中少积累错误、能检测失败、能 retry/replan。
+这两篇 PDF 属于同一条新方向: 不再把 VLA 当作一次性端到端策略, 而是在 VLA 外面包一个高层 agentic 控制环。
+
+高层用 LLM/VLM 做任务分解、记忆、验证、反思与重规划; 低层用 VLA 或 diffusion policy 执行可验证的子任务。
+
+核心 claim 不是单个 grasp/pick/place 更强, 而是长程任务中少积累错误、能检测失败、能 retry/replan。
 
 复现优先级建议:
 
@@ -22,6 +26,9 @@
 - `Agentic Robot` 原文报告 LIBERO 四套平均 SR 为 79.6%, LIBERO-Long 为 61.6%, 高于 SpatialVLA 的 78.1% 平均和 55.5% LIBERO-Long。该结果来自本地 PDF, 未复跑。
 - `Goal2Skill` 原文报告 RMBench 五个任务平均 SR 为 32.4%, 高于 ACT 和 X-VLA 的 9.8%; 在 M(n) 记忆任务上为 38.7%, 高于 X-VLA 的 9.0%。该结果来自本地 PDF, 未复跑。
 - 两者都证明的是 benchmark-specific SOTA, 不能直接概括为所有机器人操作 SOTA。
+
+
+<img src="Benchmark.png" width="50%">
 
 ## 1. 两篇 PDF 论文卡
 
