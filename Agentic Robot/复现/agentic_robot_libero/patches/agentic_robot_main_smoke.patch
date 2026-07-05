@@ -1,21 +1,63 @@
+diff --git a/experiments/robot/libero/ds.py b/experiments/robot/libero/ds.py
+index e6dcde1..ed79cc5 100644
+--- a/experiments/robot/libero/ds.py
++++ b/experiments/robot/libero/ds.py
+@@ -24,7 +24,8 @@ def parse_llm_plan(raw_plan_string: str) -> list[str]:
+ def decompose_task_with_llm(
+     task_description: str,
+     model_name: str = "deepseek-v3",
+-    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
++    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
++    api_key_env: str = "DASHSCOPE_API_KEY",
+ ) -> list[str]:
+     """
+     """
+@@ -34,9 +35,9 @@ def decompose_task_with_llm(
+     except ImportError:
+         raise ImportError("The 'openai' library is required. Please install it using 'pip install openai'.")
+
+-    api_key = os.getenv("DASHSCOPE_API_KEY")
++    api_key = os.getenv(api_key_env)
+     if not api_key:
+-        warnings.warn("Environment variable 'DASHSCOPE_API_KEY' not set. Cannot call LLM.", RuntimeWarning)
++        warnings.warn(f"Environment variable '{api_key_env}' not set. Cannot call LLM.", RuntimeWarning)
+         return []
+
+     try:
+@@ -129,7 +130,7 @@ Output:
+         warnings.warn(f"OpenAI API request exceeded rate limit: {e}", RuntimeWarning)
+         return []
+     except openai.APIStatusError as e:
+-        warnings.warn(f"OpenAI API returned an error status: {e.status_code} - {e.response}", RuntimeWarning)
++        warnings.warn(f"OpenAI-compatible API returned status {e.status_code}; cannot call LLM.", RuntimeWarning)
+         return []
+     except Exception as e:
+         warnings.warn(f"An unexpected error occurred during LLM call: {e}", RuntimeWarning)
+@@ -180,4 +181,4 @@ if __name__ == "__main__":
+         print("Correctly handled missing API key.")
+
+     if original_key:
+-        os.environ["DASHSCOPE_API_KEY"] = original_key
+\ No newline at end of file
++        os.environ["DASHSCOPE_API_KEY"] = original_key
 diff --git a/experiments/robot/libero/main.py b/experiments/robot/libero/main.py
-index 505db71..eb38d6b 100644
+index 505db71..5db0735 100644
 --- a/experiments/robot/libero/main.py
 +++ b/experiments/robot/libero/main.py
 @@ -1,6 +1,7 @@
--# run_libero_eval_pev_v1.py 
+-# run_libero_eval_pev_v1.py
 +# run_libero_eval_pev_v1.py
- 
+
  import os
 +import re
  import sys
  from dataclasses import dataclass
  from pathlib import Path
 @@ -8,7 +9,7 @@ from typing import Optional, Union
- 
+
  import draccus
  import numpy as np
--import torch 
+-import torch
 +import torch
  import tqdm
  from libero.libero import benchmark
@@ -24,15 +66,15 @@ index 505db71..eb38d6b 100644
      get_libero_image,
      quat2axisangle,
      save_rollout_video,
--    resize_image, 
+-    resize_image,
 +    resize_image,
  )
  from experiments.robot.openvla_utils import get_processor
  from experiments.robot.robot_utils import (
 @@ -39,8 +40,22 @@ from experiments.robot.robot_utils import (
  )
- 
- 
+
+
 -from qwenvl import load_qwen_vl_model, check_completion_with_qwen_vl
 -VLM_AVAILABLE = True
 +try:
@@ -51,8 +93,8 @@ index 505db71..eb38d6b 100644
 +    decompose_task_with_llm = None
 +    LLM_PLANNER_AVAILABLE = False
 +    LLM_PLANNER_IMPORT_ERROR = exc
- 
- 
+
+
  @dataclass
 @@ -64,6 +79,9 @@ class GenerateConfig:
      task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
@@ -61,16 +103,16 @@ index 505db71..eb38d6b 100644
 +    start_task_id: int = 0
 +    max_tasks: Optional[int] = None
 +    max_steps_override: Optional[int] = None
- 
+
      # #################################################################################################################
      # # Utils
-@@ -77,13 +95,70 @@ class GenerateConfig:
- 
+@@ -77,13 +95,72 @@ class GenerateConfig:
+
      seed: int = 42                                    # Random Seed (for reproducibility)
- 
--    save_frames: bool = True                        
--    frames_save_root_dir: str = "./experiments/saved_frames" 
--    verify_frequency: int = 5                       
+
+-    save_frames: bool = True
+-    frames_save_root_dir: str = "./experiments/saved_frames"
+-    verify_frequency: int = 5
 +    save_frames: bool = True
 +    frames_save_root_dir: str = "./experiments/saved_frames"
 +    verify_frequency: int = 5
@@ -81,14 +123,15 @@ index 505db71..eb38d6b 100644
 +    manual_plan: Optional[str] = None                # Separate steps with "||" or newlines.
 +    llm_planner_model: str = "deepseek-v3"
 +    llm_planner_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
++    llm_planner_api_key_env: str = "DASHSCOPE_API_KEY"
 +    vlm_model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct"
 +    vlm_device_map: str = "auto"
 +    vlm_attn_implementation: Optional[str] = None
 +    vlm_history_length: int = 1
- 
+
      # fmt: on
- 
- 
+
+
 +def parse_manual_plan(raw_plan: Optional[str]) -> list[str]:
 +    if not raw_plan:
 +        return []
@@ -126,6 +169,7 @@ index 505db71..eb38d6b 100644
 +                original_task_description,
 +                model_name=cfg.llm_planner_model,
 +                base_url=cfg.llm_planner_base_url,
++                api_key_env=cfg.llm_planner_api_key_env,
 +            )
 +            if planned_steps:
 +                return planned_steps, "llm_planner"
@@ -138,21 +182,21 @@ index 505db71..eb38d6b 100644
  @draccus.wrap()
  def eval_libero(cfg: GenerateConfig) -> None:
      assert cfg.pretrained_checkpoint is not None, "cfg.pretrained_checkpoint must not be None!"
-@@ -111,17 +186,23 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -111,17 +188,23 @@ def eval_libero(cfg: GenerateConfig) -> None:
      if cfg.model_family == "openvla":
          vla_processor = get_processor(cfg) # Renamed for clarity
- 
+
 -    # Load VLM model (Verifier V) - Load once before the loops
 +    # Load VLM model (Verifier V) only when explicitly enabled.
      vlm_model, vlm_processor = None, None
 -
 -    print("No VLM")
      VLM_ENABLED_EFFECTIVELY = False
--    
+-
 -    hardcoded_plan = [
 -        "put both the alphabet soup and the tomato sauce in the basket",
 -    ]
--    
+-
 -    print(f"使用硬编码计划进行测试: {hardcoded_plan}")
 +    if cfg.enable_vlm_verifier:
 +        if not VLM_AVAILABLE:
@@ -168,20 +212,21 @@ index 505db71..eb38d6b 100644
 +                print("Warning: VLM verifier requested but model/processor did not load.")
 +    else:
 +        print("VLM verifier disabled; running OpenVLA executor baseline.")
- 
+
      # Initialize local logging
      run_id = f"PEV_V1-EVAL-{cfg.task_suite_name}-{cfg.model_family}-{DATE_TIME}" # Added PEV_V1 prefix
-@@ -132,7 +213,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -132,7 +215,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
      log_file = open(local_log_filepath, "w")
      print(f"Logging to local log file: {local_log_filepath}")
      log_file.write(f"PEV V1 Evaluation Run\n")
 -    log_file.write(f"Hardcoded Plan: {hardcoded_plan}\n")
 +    log_file.write(f"LLM Planner Enabled: {cfg.use_llm_planner}\n")
++    log_file.write(f"LLM Planner API Key Env: {cfg.llm_planner_api_key_env}\n")
 +    log_file.write(f"Manual Plan: {cfg.manual_plan}\n")
      log_file.write(f"VLM Verification Enabled: {VLM_ENABLED_EFFECTIVELY}\n")
- 
+
      frames_run_dir = None # Initialize here
-@@ -150,7 +232,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -150,7 +235,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
              name=run_id,
              config=draccus.encode(cfg) # Log config
          )
@@ -193,11 +238,11 @@ index 505db71..eb38d6b 100644
 +                "vlm_enabled": VLM_ENABLED_EFFECTIVELY,
 +            }
 +        )
- 
- 
+
+
      # Initialize LIBERO task suite
-@@ -165,7 +253,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
- 
+@@ -165,7 +256,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+
      # Start evaluation
      total_episodes, total_successes = 0, 0
 -    for task_id in tqdm.tqdm(range(num_tasks_in_suite), desc="Tasks"):
@@ -205,9 +250,9 @@ index 505db71..eb38d6b 100644
 +    for task_id in tqdm.tqdm(range(cfg.start_task_id, task_end), desc="Tasks"):
          # Get task
          task = task_suite.get_task(task_id)
- 
-@@ -174,6 +263,14 @@ def eval_libero(cfg: GenerateConfig) -> None:
- 
+
+@@ -174,6 +266,14 @@ def eval_libero(cfg: GenerateConfig) -> None:
+
          # Initialize LIBERO environment and ORIGINAL task description
          env, original_task_description = get_libero_env(task, cfg.model_family, resolution=256)
 +        task_plan, plan_source = build_plan_for_task(cfg, original_task_description, log_file)
@@ -218,12 +263,12 @@ index 505db71..eb38d6b 100644
 +        print(f"Plan source for task {task_id}: {plan_source}; plan: {task_plan}")
 +        log_file.write(f"Plan Source: {plan_source}\n")
 +        log_file.write(f"Plan: {task_plan}\n")
- 
+
          # Start episodes
          task_episodes, task_successes = 0, 0
-@@ -188,18 +285,17 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -188,18 +288,17 @@ def eval_libero(cfg: GenerateConfig) -> None:
              obs = env.set_init_state(initial_states[episode_idx])
- 
+
              current_subtask_index = 0
 -            if not hardcoded_plan:
 +            if not task_plan:
@@ -237,87 +282,87 @@ index 505db71..eb38d6b 100644
              print(f"Starting Episode {episode_idx+1} with Subtask 1: '{current_subtask_instruction}'")
              log_file.write(f"Episode {episode_idx+1} | Subtask {current_subtask_index+1}: {current_subtask_instruction}\n")
              plan_completed_by_vlm = False
- 
+
 -            image_pair_queue = collections.deque(maxlen=1)
 +            image_pair_queue = collections.deque(maxlen=max(1, cfg.vlm_history_length))
- 
+
              episode_frame_save_dir = None
              if cfg.save_frames and frames_run_dir: # Check frames_run_dir exists
-@@ -223,6 +319,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -223,6 +322,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
                  max_steps = 400
              else: # Fallback
                  max_steps = 400
 +            if cfg.max_steps_override is not None:
 +                max_steps = cfg.max_steps_override
- 
+
              log_file.write(f"Starting episode run (max_steps={max_steps})...\n")
              while t < max_steps + cfg.num_steps_wait:
-@@ -231,13 +329,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -231,13 +332,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
                      if t < cfg.num_steps_wait:
                          obs, reward, done, info = env.step(get_libero_dummy_action(cfg.model_family))
- 
--                        if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0): 
+
+-                        if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
 +                        if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
                               img_main_np_wait = get_libero_image(obs, resize_size)
                               img_eih_np_wait = obs["robot0_eye_in_hand_image"]
                               main_img_pil_wait = Image.fromarray(img_main_np_wait)
                               eih_img_pil_wait = Image.fromarray(img_eih_np_wait)
                               image_pair_queue.append((main_img_pil_wait, eih_img_pil_wait))
--                    
+-
 +
                          t += 1
                          continue
- 
-@@ -264,16 +362,16 @@ def eval_libero(cfg: GenerateConfig) -> None:
+
+@@ -264,16 +365,16 @@ def eval_libero(cfg: GenerateConfig) -> None:
                              print(f"Warning: Failed to save frame {t}. Error: {save_e}")
                              log_file.write(f"Warning: Failed to save frame {t}. Error: {save_e}\n")
- 
--                
+
+-
 +
                      image_collected_this_step = False
--                    if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0): 
+-                    if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
 +                    if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
                          image_collected_this_step = True
--                        
+-
 +
                          main_img_pil = Image.fromarray(img_main_np)
                          eih_img_pil = Image.fromarray(img_eih_np)
                          image_pair_queue.append((main_img_pil, eih_img_pil))
- 
--                        
+
+-
 +
                          if cfg.save_frames and episode_frame_save_dir:
                               try:
                                   frame_filename = f"frame_{t:04d}.png"
-@@ -284,39 +382,39 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -284,39 +385,39 @@ def eval_libero(cfg: GenerateConfig) -> None:
                                   print(f"Warning: Failed to save frame {t}. Error: {save_e}")
                                   log_file.write(f"Warning: Failed to save frame {t}. Error: {save_e}\n")
- 
--                    
+
+-
 +
                      vlm_check_this_step = False
--                    if VLM_ENABLED_EFFECTIVELY and (t % cfg.verify_frequency == 0): 
+-                    if VLM_ENABLED_EFFECTIVELY and (t % cfg.verify_frequency == 0):
 +                    if VLM_ENABLED_EFFECTIVELY and (t % cfg.verify_frequency == 0):
                           vlm_check_this_step = True
- 
+
                      if vlm_check_this_step and not plan_completed_by_vlm:
--                        
+-
 +
                          print(f"[t={t}] Performing VLM check for subtask: '{current_subtask_instruction}' using queue (size {len(image_pair_queue)})")
                          log_file.write(f"[t={t}] VLM Check Start: '{current_subtask_instruction}' (Queue size: {len(image_pair_queue)})\n")
- 
+
                          is_subtask_complete = check_completion_with_qwen_vl(
                              vlm_model=vlm_model,
                              vlm_processor=vlm_processor,
--                            image_pair_queue=image_pair_queue, 
+-                            image_pair_queue=image_pair_queue,
 +                            image_pair_queue=image_pair_queue,
                              current_subtask_instruction=current_subtask_instruction
                          )
- 
+
                          log_file.write(f"[t={t}] VLM Check Result: {'Complete' if is_subtask_complete else 'Not Complete'}\n")
- 
+
                          if is_subtask_complete:
--                            
+-
 +
                              print(f"[t={t}] VLM Confirmed: Subtask '{current_subtask_instruction}' COMPLETE.")
                              current_subtask_index += 1
@@ -334,42 +379,42 @@ index 505db71..eb38d6b 100644
                                  log_file.write(f"[t={t}] VLM: Plan finished.\n")
                                  plan_completed_by_vlm = True
                                  print(f"[t={t}] Continuing execution with last subtask instruction: '{current_subtask_instruction}' until env done or max_steps.")
--                   
+-
 +
                      # Save main image for replay video (use the already processed img_main_np)
                      replay_images.append(img_main_np)
- 
-@@ -328,7 +426,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
+
+@@ -328,7 +429,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                          ),
                      }
- 
--                    
+
+-
 +
                      action = get_action(
                          cfg,
                          vla_model, # Use VLA model
-@@ -337,7 +435,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -337,7 +438,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                          current_subtask_instruction,
                          vla_processor, # Use VLA processor
                      )
--                    
+-
 +
- 
+
                      # Normalize gripper action
                      action = normalize_gripper_action(action, binarize=True)
-@@ -446,13 +544,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
- 
- 
+@@ -446,13 +547,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
+
+
  if __name__ == "__main__":
--    
+-
 +
      print(f"Start: {time.strftime('%Y-%m-%d %H:%M:%S')}")
--    start_time = time.perf_counter() 
+-    start_time = time.perf_counter()
 +    start_time = time.perf_counter()
- 
+
      eval_libero()
- 
--    end_time = time.perf_counter() 
+
+-    end_time = time.perf_counter()
 +    end_time = time.perf_counter()
      duration = end_time - start_time
      print(f"\n end: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -387,7 +432,7 @@ index 9a86c5b..9e434fb 100644
 -from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 +from transformers import AutoProcessor
  import traceback
--import collections 
+-import collections
 -
 -# 尝试导入 Qwen-VL 官方提供的工具函数 (保持不变)
 -from qwen_vl_utils import process_vision_info
@@ -456,11 +501,11 @@ index 9a86c5b..9e434fb 100644
  def check_completion_with_qwen_vl(
      vlm_model,
      vlm_processor,
--  
--    image_pair_queue: collections.deque, 
+-
+-    image_pair_queue: collections.deque,
 +
 +    image_pair_queue: collections.deque,
- 
+
      current_subtask_instruction: str
  ) -> bool:
 @@ -55,16 +78,16 @@ def check_completion_with_qwen_vl(
@@ -470,65 +515,65 @@ index 9a86c5b..9e434fb 100644
 -        print("[VLM Check] Error: qwen_vl_utils not available.")
 +        print(f"[VLM Check] Error: qwen_vl_utils not available: {QWEN_UTILS_IMPORT_ERROR}")
          return False
--    
+-
 +
      if not image_pair_queue:
          print("[VLM Check] Warning: Image queue is empty. Cannot perform check.")
          return False
--    
+-
 +
- 
+
      try:
--        
+-
 +
- 
+
          object_name = "the object" # Default English names
          location_name = "the target location"
 @@ -90,31 +113,31 @@ def check_completion_with_qwen_vl(
                      split_success = True
                      break
              if not split_success: object_name = object_part_raw if object_part_raw else object_name
--        
+-
 +
          prompt_text = ""
--       
+-
 +
          prompt_prefix = f"Observe the following sequence of {len(image_pair_queue)} image pairs (main view and hand view over time). The instruction for the robot is: '{current_subtask_instruction}'. "
- 
+
          if verb == "pick up":
--            
+-
 +
              prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been securely grasped by the gripper and clearly lifted off any surface it was resting on by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
          elif verb == "place":
--            
+-
 +
              prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been stably placed {location_name} (e.g., 'in the basket', 'on the table'), and does the gripper appear empty or clearly moving away from the object by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
          else:
--           
+-
 +
              prompt_text = f"{prompt_prefix}Based *only* on the image sequence and the instruction, has this action been successfully completed by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
--        
+-
 +
- 
+
          content_list = []
--        
+-
 +
          for i, (main_img_pil, eih_img_pil) in enumerate(image_pair_queue):
              content_list.append({"type": "text", "text": f"Image Pair {i+1} (Main View):"})
              content_list.append({"type": "image", "image": main_img_pil})
              content_list.append({"type": "text", "text": f"Image Pair {i+1} (Hand View):"})
              content_list.append({"type": "image", "image": eih_img_pil})
- 
--        
+
+-
 +
          content_list.append({"type": "text", "text": prompt_text})
- 
+
          messages = [
 @@ -123,7 +146,7 @@ def check_completion_with_qwen_vl(
                  "content": content_list,
              }
          ]
--        
+-
 +
          text_template = vlm_processor.apply_chat_template(
              messages, tokenize=False, add_generation_prompt=True
