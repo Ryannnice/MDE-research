@@ -594,6 +594,60 @@ WANDB_MODE=disabled \
   --llm_planner_model gpt-4o-mini
 ```
 
+### 10. DashScope `qwen-plus` planner / SAP 小规模 ablation
+
+2026-07-05 使用 DashScope OpenAI-compatible endpoint 验证 LRM planner 路径：
+
+```text
+base_url https://dashscope.aliyuncs.com/compatible-mode/v1
+model qwen-plus
+api_key_env DASHSCOPE_API_KEY
+```
+
+API smoke 结果：
+
+| task | parsed plan |
+|---|---|
+| `pick up the black bowl between the plate and the ramekin and place it on the plate` | `['pick up the black bowl between the plate and the ramekin and place it on the plate']` |
+| `put both the alphabet soup and the tomato sauce in the basket` | `['put the alphabet soup in the basket', 'put the tomato sauce in the basket']` |
+| `turn on the stove and put the moka pot on it` | `['turn on the stove', 'put the moka pot on the stove']` |
+
+代码调整：
+
+1. `ds.py` 的 planner prompt 改为 outcome-level subgoals；单对象 transfer 保留原始 wording，避免丢掉 source location / spatial relation。
+2. `qwenvl.py` 的 verifier prompt 识别 `put ... in/on ...`，与 `place ... in/on ...` 一样按放置完成条件判断。
+3. `main.py` 增加 `--start_episode_id`，用于对齐指定初始状态做小规模 ablation；默认值为 `0`，不改变完整 baseline 行为。
+
+实测结果：
+
+| 配置 | 任务 / 初始状态 | plan | 结果 | 结论 |
+|---|---|---|---:|---|
+| `qwen-plus planner + Qwen verifier + OpenVLA`，旧 atomic prompt | `libero_spatial` task 0 episode 0 | `pick up black bowl` -> `place black bowl on plate` | `0/1` | atomic `pick/place` 会破坏 OpenVLA executor |
+| `qwen-plus planner + Qwen verifier + OpenVLA`，outcome prompt 但丢 source relation | `libero_spatial` task 0 episode 0 | `put the black bowl on the plate` | `0/1` | source/spatial wording 不能丢 |
+| `qwen-plus planner + Qwen verifier + OpenVLA`，保留单对象原始 wording | `libero_spatial` task 0 episode 0 | 原始完整任务 | `1/1`，`t=91` env success | LRM planner 路径可用，且不破坏单步 executor |
+| `qwen-plus planner + Qwen verifier + OpenVLA`，multi-object split | `libero_10` task 0 episode 0 | `put alphabet soup in basket` -> `put tomato sauce in basket` | `0/1` | episode 0 原始 baseline 也失败，不能单独说明 SAP 退化 |
+| `qwen-plus planner + Qwen verifier + OpenVLA`，multi-object split | `libero_10` task 0 episode 1 | `put alphabet soup in basket` -> `put tomato sauce in basket` | `0/1` | 同一初始状态原始 baseline 成功，说明当前 split/verifier 策略会退化 |
+| 原始完整任务 + Qwen verifier + OpenVLA | `libero_10` task 0 episode 1 | 原始完整任务 | `1/1`，`t=272` env success | VLM 环境本身未破坏 executor，退化来自子任务拆分/切换策略 |
+| 手工 object-level split + Qwen verifier + OpenVLA | `libero_10` task 1 episode 0 | `put cream cheese box in basket` -> `put butter in basket` | `1/1`，`t=321` env success | verifier 未确认第一步完成，但 executor 在第一条子任务下仍完成整任务；说明部分多物体任务可被 executor 泛化兜住 |
+| 手工 state/action split + Qwen verifier + OpenVLA | `libero_10` task 2 episode 0 | `turn on stove` -> `put moka pot on stove` | `0/1` | verifier 在 `t=120` 成功切到第二步，但最终 timeout；同一初始状态原始 baseline 成功，说明切换时机 / 子任务 wording / verifier 策略仍会退化 |
+| `qwen-plus planner + Qwen verifier + OpenVLA` | `libero_10` task 2 episode 0 | `turn on stove` -> `put moka pot on stove` | `0/1` | 百炼 planner 真实路径生成与手工相同的 plan；verifier 在 `t=120` 切换，最终 timeout，确认问题不在 API fallback |
+
+新增日志：
+
+```text
+data/logs/PEV_V1-EVAL-libero_spatial-openvla-2026_07_05-16_27_14--planner_qwen_plus_verifier_task0_1trial.txt
+data/logs/PEV_V1-EVAL-libero_spatial-openvla-2026_07_05-16_30_27--planner_qwen_plus_outcome_verifier_task0_1trial.txt
+data/logs/PEV_V1-EVAL-libero_spatial-openvla-2026_07_05-16_33_54--planner_qwen_plus_preserve_single_verifier_task0_1trial.txt
+data/logs/PEV_V1-EVAL-libero_10-openvla-2026_07_05-16_35_33--planner_qwen_plus_verifier_libero10_task0_1trial.txt
+data/logs/PEV_V1-EVAL-libero_10-openvla-2026_07_05-16_40_51--planner_qwen_plus_verifier_libero10_task0_ep1_1trial.txt
+data/logs/PEV_V1-EVAL-libero_10-openvla-2026_07_05-16_45_06--original_instruction_verifier_libero10_task0_ep1_1trial.txt
+data/logs/PEV_V1-EVAL-libero_10-openvla-2026_07_05-17_56_31--manual_split_verifier_libero10_task1_ep0_1trial.txt
+data/logs/PEV_V1-EVAL-libero_10-openvla-2026_07_05-17_59_59--manual_split_verifier_libero10_task2_ep0_1trial.txt
+data/logs/PEV_V1-EVAL-libero_10-openvla-2026_07_05-18_18_35--planner_qwen_plus_verifier_libero10_task2_ep0_1trial.txt
+```
+
+结论：DashScope `qwen-plus` planner 已可用，之前的 LRM API key 阻塞解除；但当前 zero-shot Qwen verifier 与 OpenVLA 子任务拆分仍不能代表论文完整 SAP。新增 ablation 显示 verifier 可以在 `turn on stove` 这类状态子任务上触发切换，但切到后续放置子任务后仍可能使原本成功的 baseline 失败；百炼 planner 真实路径复现了同样现象。下一步需要 fine-tuned verifier / 更稳的子任务完成判定 / executor-friendly subgoal policy，而不是简单把长程任务拆成 object-level `put` 子任务。
+
 ## 完整评估命令
 
 已用以下形式跑通 `libero_spatial`、`libero_object`、`libero_goal` 和 `libero_10`。要复跑或切 suite，只需替换 checkpoint 和 `--task_suite_name`：
@@ -640,9 +694,10 @@ patches/agentic_robot_main_smoke.patch
 修正内容：
 
 1. `qwenvl.py` 依赖 `Qwen2_5_VLForConditionalGeneration`，但 OpenVLA 推荐的 `transformers==4.40.1` 不支持该类。已改为延迟到 `load_qwen_vl_model()` 内部导入，使当前 OpenVLA executor 环境可以正常 import；真正启用 VLM verifier 时仍需要更新版 `transformers`。
-2. 增加 `--start_task_id`、`--max_tasks`、`--max_steps_override`，用于最小 smoke eval。默认值不改变完整评估行为。
+2. 增加 `--start_task_id`、`--max_tasks`、`--start_episode_id`、`--max_steps_override`，用于最小 smoke eval 和指定初始状态 ablation。默认值不改变完整评估行为。
 3. 增加显式 SAP 控制参数：`--enable_vlm_verifier`、`--use_llm_planner`、`--manual_plan`、`--llm_planner_api_key_env`、`--vlm_model_id`、`--vlm_attn_implementation`、`--vlm_history_length` 等。默认不启用 planner / verifier，因此已完成的 baseline 仍是纯 OpenVLA executor。
 4. 当 multi-step plan 存在但 VLM verifier 未启用时，本地代码会回退到原始任务指令，避免只执行第一个 subtask 后无法推进。
+5. `ds.py` planner prompt 改为 executor-friendly outcome-level planning：单对象 transfer 保留原始 wording，多对象任务按对象 outcome 拆分；避免早期 atomic `pick/place` prompt 导致 executor 退化。
 
 ## 关键依赖坑
 
@@ -691,12 +746,13 @@ flash-attn==2.5.5
 current_subtask_instruction = original_task_description
 ```
 
-也就是说，原始默认 eval 更接近 OpenVLA executor 评估，而不是论文完整的 Planner-Executor-Verifier 闭环。本地 patch 已把 planner / verifier 做成显式可开关路径，且 verifier 集成 smoke 已通过；完整 SAP 指标还未完成，剩余条件是：
+也就是说，原始默认 eval 更接近 OpenVLA executor 评估，而不是论文完整的 Planner-Executor-Verifier 闭环。本地 patch 已把 planner / verifier 做成显式可开关路径，且 verifier 集成 smoke 已通过；DashScope `qwen-plus` planner 路径也已验证。完整 SAP 指标仍未完成，剩余条件是：
 
-- 有效的 `DASHSCOPE_API_KEY` 或等价 LRM 接口 key，用于批量生成 task-level plan；当前本机 `OPENAI_API_KEY` 对 `https://api.openai.com/v1` 返回 401。
-- 使用 `ar_agentic_libero_vlm` 跑 `libero_10` 或指定 task 的 SAP ablation，对比 executor baseline。
-- 若继续追求论文完整设置，需要确认 LRM planner、manual plan、verifier 频率和历史帧长度等 ablation 配置。
-- 当前手写 `pick/place` 分解在 `libero_spatial` task 0 上使 executor 从对照 `1/1` 变成 `0/1`，因此不能直接用该朴素分解代表论文 SAP。
+- 当前 zero-shot Qwen verifier 没有稳定复现论文 fine-tuned verifier 的 subgoal completion gate。
+- `libero_10` task 0 episode 1 上，object-level split 从原始完整任务的 `1/1` 退化为 `0/1`，说明简单拆成 `put object in basket` 不能代表论文 SAP。
+- `libero_10` task 2 episode 0 上，verifier 能把 `turn on stove` 判为完成并切换，但后续 `put moka pot on stove` timeout；同一初始状态原始完整任务 baseline 成功。
+- 若继续追求论文完整设置，需要确认 / 复现 fine-tuned verifier、recovery 逻辑、verifier 频率、历史帧长度和 executor-friendly subgoal policy。
+- 当前 atomic `pick/place` 分解在 `libero_spatial` task 0 上使 executor 从对照 `1/1` 变成 `0/1`，因此不能直接用朴素分解代表论文 SAP。
 
 ## 参考源
 
