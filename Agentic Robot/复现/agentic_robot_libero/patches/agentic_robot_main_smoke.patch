@@ -1,45 +1,163 @@
 diff --git a/experiments/robot/libero/ds.py b/experiments/robot/libero/ds.py
-index e6dcde1..4d0ef93 100644
+index e6dcde1..6250da7 100644
 --- a/experiments/robot/libero/ds.py
 +++ b/experiments/robot/libero/ds.py
-@@ -24,7 +24,8 @@ def parse_llm_plan(raw_plan_string: str) -> list[str]:
+@@ -1,7 +1,21 @@
+-import openai
+ import os
+ import re
+-import warnings 
++from urllib.parse import urlparse
++import warnings
++
++
++def normalize_openai_base_url(base_url: str) -> str:
++    normalized = base_url.strip()
++    if "://" not in normalized:
++        normalized = f"https://{normalized}"
++
++    parsed = urlparse(normalized)
++    if parsed.path in ("", "/"):
++        normalized = normalized.rstrip("/") + "/v1"
++    else:
++        normalized = normalized.rstrip("/")
++
++    return normalized
+ 
+ # --- Helper Function ---
+ def parse_llm_plan(raw_plan_string: str) -> list[str]:
+@@ -20,11 +34,55 @@ def parse_llm_plan(raw_plan_string: str) -> list[str]:
+                 subtasks.append(instruction)
+     return subtasks
+ 
++
++_ARTICLE_PREFIXES = (
++    "the ",
++    "a ",
++    "an ",
++    "this ",
++    "that ",
++    "these ",
++    "those ",
++    "both ",
++    "left ",
++    "right ",
++)
++
++
++def _with_default_article(noun_phrase: str) -> str:
++    noun_phrase = noun_phrase.strip()
++    if not noun_phrase:
++        return noun_phrase
++    if noun_phrase.lower().startswith(_ARTICLE_PREFIXES):
++        return noun_phrase
++    return f"the {noun_phrase}"
++
++
++def normalize_atomic_skill_articles(instruction: str) -> str:
++    instruction = instruction.strip()
++    instruction_lower = instruction.lower()
++
++    for prefix in ("pick up ", "turn on ", "turn off ", "open ", "close "):
++        if instruction_lower.startswith(prefix):
++            return f"{prefix}{_with_default_article(instruction[len(prefix):])}"
++
++    place_match = re.match(r"^(place|put)\s+(.+?)\s+(in|on|into|onto)\s+(.+)$", instruction, flags=re.IGNORECASE)
++    if place_match:
++        verb, object_name, relation, target_name = place_match.groups()
++        return (
++            f"{verb.lower()} {_with_default_article(object_name)} "
++            f"{relation.lower()} {_with_default_article(target_name)}"
++        )
++
++    return instruction
++
+ # --- Main Function ---
  def decompose_task_with_llm(
      task_description: str,
      model_name: str = "deepseek-v3",
 -    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 +    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
 +    api_key_env: str = "DASHSCOPE_API_KEY",
++    planner_style: str = "outcome",
  ) -> list[str]:
      """
      """
-@@ -34,9 +35,9 @@ def decompose_task_with_llm(
+@@ -34,55 +92,100 @@ def decompose_task_with_llm(
      except ImportError:
          raise ImportError("The 'openai' library is required. Please install it using 'pip install openai'.")
-
+ 
 -    api_key = os.getenv("DASHSCOPE_API_KEY")
 +    api_key = os.getenv(api_key_env)
      if not api_key:
 -        warnings.warn("Environment variable 'DASHSCOPE_API_KEY' not set. Cannot call LLM.", RuntimeWarning)
 +        warnings.warn(f"Environment variable '{api_key_env}' not set. Cannot call LLM.", RuntimeWarning)
          return []
-
+ 
      try:
-@@ -49,40 +50,45 @@ def decompose_task_with_llm(
+         client = openai.OpenAI(
+             api_key=api_key,
+-            base_url=base_url
++            base_url=normalize_openai_base_url(base_url),
+         )
+     except Exception as e:
+         warnings.warn(f"Failed to initialize OpenAI client: {e}", RuntimeWarning)
          return []
-
-     task_decomposition_prompt = f"""
+ 
+-    task_decomposition_prompt = f"""
 -You are a planning assistant for a fixed robotic arm. Your goal is to break down a high-level task into a sequence of **essential high-level commands**, suitable for a capable Vision-Language-Action (VLA) model to execute directly.
-+You are a planning assistant for a fixed robotic arm. Your goal is to break down a high-level task into a sequence of **outcome-level subgoals**, suitable for a capable Vision-Language-Action (VLA) model to execute directly.
-
++    if planner_style == "paper_atomic":
++        task_decomposition_prompt = f"""
++You are a planning assistant for a fixed robotic arm. Break the high-level task into the paper-style atomic skill sequence used by a Planner-Executor-Verifier robot loop.
+ 
  Output Format:
 -Generate a numbered list of commands. Each command should represent a significant action achieving a clear sub-goal. Stick to the allowed high-level actions.
++Generate a numbered list of high-level robot skills. Each skill must be one of:
++- pick up the <object>
++- place the <object> in/on the <target location>
++- open the <container/drawer>
++- close the <container/drawer>
++- turn on the <device>
++- turn off the <device>
++
++Examples:
++Goal: Put the apple in the red bowl
++1. pick up the apple
++2. place the apple in the red bowl
++
++Goal: Put both the alphabet soup and the tomato sauce in the basket
++1. pick up the alphabet soup
++2. place the alphabet soup in the basket
++3. pick up the tomato sauce
++4. place the tomato sauce in the basket
++
++Goal: Turn on the stove and put the pot on it
++1. turn on the stove
++2. pick up the pot
++3. place the pot on the stove
++
++Instructions:
++- Use only the allowed skills above.
++- Keep object and target names exactly as described by the task when possible.
++- Use natural LIBERO-style wording with articles: write "turn on the stove", not "turn on stove".
++- Do not include locate, move, lift, lower, grasp, release, adjust, inspect, verify, or wait as separate steps.
++- Produce only the numbered plan.
++
++Task: {task_description}
++Output:
++"""
++    else:
++        task_decomposition_prompt = f"""
++You are a planning assistant for a fixed robotic arm. Your goal is to break down a high-level task into a sequence of **outcome-level subgoals**, suitable for a capable Vision-Language-Action (VLA) model to execute directly.
++
++Output Format:
 +Generate a numbered list of commands. Each command should represent a meaningful completed outcome that the VLA can execute and a visual verifier can judge.
-
+ 
  Example Plan Format (Use **exactly** this level of granularity):
  Plan for the robot arm:
-
+ 
  Goal: <original instruction>
-
+ 
 -1. pick up the <object_name_1>
 -2. place the <object_name_1> in the <target_location>
 -3. pick up the <object_name_2>
@@ -70,7 +188,7 @@ index e6dcde1..4d0ef93 100644
 +# --- Example for another task ---
 +# Goal: Pick up the black bowl between the plate and the ramekin and place it on the plate
 +# 1. pick up the black bowl between the plate and the ramekin and place it on the plate
-
+ 
  Instructions:
 -- Generate **only** high-level commands.
 -- **Allowed commands are strictly limited to:**
@@ -86,7 +204,7 @@ index e6dcde1..4d0ef93 100644
      - `open [object/container/drawer/etc.]`
      - `close [object/container/drawer/etc.]`
      - `turn on [device]`
-@@ -93,8 +99,8 @@ Instructions:
+@@ -93,8 +196,8 @@ Instructions:
      - `move to` or `move towards` (Assume the command includes necessary travel)
      - `lift`, `lower`, `grasp`, `release`, `push`, `pull`, `rotate`, `adjust` (Assume high-level commands handle these internally)
  - **Assume the VLA model handles all implicit actions:**
@@ -96,7 +214,15 @@ index e6dcde1..4d0ef93 100644
      - "open/close [container]" means: Find the handle/seam, interact with it appropriately (pull, slide, lift) to change the container's state.
      - "turn on/off [device]" means: Find the correct button/switch, interact with it to change the device's power state.
  - Use the descriptive names from the task description (e.g., "alphabet soup", "basket", "stove", "microwave", "bottom drawer").
-@@ -129,7 +135,7 @@ Output:
+@@ -111,6 +214,7 @@ Output:
+             messages=[
+                 {"role": "user", "content": task_decomposition_prompt}
+             ],
++            temperature=0,
+             stream=True,
+         )
+ 
+@@ -129,7 +233,7 @@ Output:
          warnings.warn(f"OpenAI API request exceeded rate limit: {e}", RuntimeWarning)
          return []
      except openai.APIStatusError as e:
@@ -105,31 +231,40 @@ index e6dcde1..4d0ef93 100644
          return []
      except Exception as e:
          warnings.warn(f"An unexpected error occurred during LLM call: {e}", RuntimeWarning)
-@@ -180,4 +186,4 @@ if __name__ == "__main__":
+@@ -140,6 +244,8 @@ Output:
+          return []
+ 
+     parsed_subtasks = parse_llm_plan(answer_content)
++    if planner_style == "paper_atomic":
++        parsed_subtasks = [normalize_atomic_skill_articles(step) for step in parsed_subtasks]
+ 
+     return parsed_subtasks
+ 
+@@ -180,4 +286,4 @@ if __name__ == "__main__":
          print("Correctly handled missing API key.")
-
+ 
      if original_key:
 -        os.environ["DASHSCOPE_API_KEY"] = original_key
 \ No newline at end of file
 +        os.environ["DASHSCOPE_API_KEY"] = original_key
 diff --git a/experiments/robot/libero/main.py b/experiments/robot/libero/main.py
-index 505db71..b75d28a 100644
+index 505db71..676a946 100644
 --- a/experiments/robot/libero/main.py
 +++ b/experiments/robot/libero/main.py
 @@ -1,6 +1,7 @@
--# run_libero_eval_pev_v1.py
+-# run_libero_eval_pev_v1.py 
 +# run_libero_eval_pev_v1.py
-
+ 
  import os
 +import re
  import sys
  from dataclasses import dataclass
  from pathlib import Path
 @@ -8,7 +9,7 @@ from typing import Optional, Union
-
+ 
  import draccus
  import numpy as np
--import torch
+-import torch 
 +import torch
  import tqdm
  from libero.libero import benchmark
@@ -138,25 +273,47 @@ index 505db71..b75d28a 100644
      get_libero_image,
      quat2axisangle,
      save_rollout_video,
--    resize_image,
+-    resize_image, 
 +    resize_image,
  )
  from experiments.robot.openvla_utils import get_processor
  from experiments.robot.robot_utils import (
-@@ -39,8 +40,22 @@ from experiments.robot.robot_utils import (
+@@ -39,8 +40,44 @@ from experiments.robot.robot_utils import (
  )
-
-
+ 
+ 
 -from qwenvl import load_qwen_vl_model, check_completion_with_qwen_vl
 -VLM_AVAILABLE = True
 +try:
-+    from qwenvl import load_qwen_vl_model, check_completion_with_qwen_vl
++    from qwenvl import (
++        check_completion_with_qwen_vl,
++        diagnose_stuck_with_qwen_vl,
++        load_qwen_vl_model,
++    )
 +    VLM_AVAILABLE = True
 +except ImportError as exc:
 +    load_qwen_vl_model = None
 +    check_completion_with_qwen_vl = None
++    diagnose_stuck_with_qwen_vl = None
 +    VLM_AVAILABLE = False
 +    VLM_IMPORT_ERROR = exc
++
++try:
++    from api_vlm import check_completion_with_api_vlm, diagnose_stuck_with_api_vlm
++    API_VLM_AVAILABLE = True
++except ImportError as exc:
++    check_completion_with_api_vlm = None
++    diagnose_stuck_with_api_vlm = None
++    API_VLM_AVAILABLE = False
++    API_VLM_IMPORT_ERROR = exc
++
++try:
++    from oracle_verifier import check_completion_with_libero_oracle
++    ORACLE_VERIFIER_AVAILABLE = True
++except ImportError as exc:
++    check_completion_with_libero_oracle = None
++    ORACLE_VERIFIER_AVAILABLE = False
++    ORACLE_VERIFIER_IMPORT_ERROR = exc
 +
 +try:
 +    from ds import decompose_task_with_llm
@@ -165,10 +322,10 @@ index 505db71..b75d28a 100644
 +    decompose_task_with_llm = None
 +    LLM_PLANNER_AVAILABLE = False
 +    LLM_PLANNER_IMPORT_ERROR = exc
-
-
+ 
+ 
  @dataclass
-@@ -64,6 +79,10 @@ class GenerateConfig:
+@@ -64,6 +101,10 @@ class GenerateConfig:
      task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
      num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
      num_trials_per_task: int = 5                  # Number of rollouts per task (原默认 50)
@@ -176,16 +333,16 @@ index 505db71..b75d28a 100644
 +    max_tasks: Optional[int] = None
 +    start_episode_id: int = 0
 +    max_steps_override: Optional[int] = None
-
+ 
      # #################################################################################################################
      # # Utils
-@@ -77,13 +96,72 @@ class GenerateConfig:
-
+@@ -77,13 +118,262 @@ class GenerateConfig:
+ 
      seed: int = 42                                    # Random Seed (for reproducibility)
-
--    save_frames: bool = True
--    frames_save_root_dir: str = "./experiments/saved_frames"
--    verify_frequency: int = 5
+ 
+-    save_frames: bool = True                        
+-    frames_save_root_dir: str = "./experiments/saved_frames" 
+-    verify_frequency: int = 5                       
 +    save_frames: bool = True
 +    frames_save_root_dir: str = "./experiments/saved_frames"
 +    verify_frequency: int = 5
@@ -194,17 +351,34 @@ index 505db71..b75d28a 100644
 +    enable_vlm_verifier: bool = False
 +    use_llm_planner: bool = False
 +    manual_plan: Optional[str] = None                # Separate steps with "||" or newlines.
++    llm_planner_style: str = "outcome"              # Options: outcome, paper_atomic.
 +    llm_planner_model: str = "deepseek-v3"
 +    llm_planner_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 +    llm_planner_api_key_env: str = "DASHSCOPE_API_KEY"
++    llm_planner_fallback_model: Optional[str] = None
++    llm_planner_fallback_base_url: Optional[str] = None
++    llm_planner_fallback_api_key_env: Optional[str] = None
 +    vlm_model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct"
 +    vlm_device_map: str = "auto"
 +    vlm_attn_implementation: Optional[str] = None
-+    vlm_history_length: int = 1
-
++    vlm_verifier_backend: str = "qwen_local"         # Options: qwen_local, openai_api, libero_oracle.
++    api_vlm_model: str = "gpt-5.4-mini"
++    api_vlm_base_url: str = "https://Codex.hldragon.xyz/v1"
++    api_vlm_api_key_env: str = "OPENAI_API_KEY"
++    vlm_history_length: int = 2
++    stuck_detection_mode: str = "heuristic"          # Options: none, heuristic, vlm.
++    stuck_no_progress_checks: int = 3
++    stuck_eef_delta_threshold: float = 0.01
++    recovery_max_attempts: int = 2
++    recovery_lift_steps: int = 12
++    recovery_lift_delta_z: float = 0.35
++    executor_instruction_mode: str = "subtask"       # Options: subtask, original, original_after_first_switch, subtask_with_original_context, subtask_with_progress_context.
++    verify_on_env_success: bool = False
++    vlm_completion_confirmations: int = 1
+ 
      # fmt: on
-
-
+ 
+ 
 +def parse_manual_plan(raw_plan: Optional[str]) -> list[str]:
 +    if not raw_plan:
 +        return []
@@ -225,6 +399,34 @@ index 505db71..b75d28a 100644
 +    return steps
 +
 +
++def call_llm_planner_for_task(
++    task_description: str,
++    model_name: Optional[str],
++    base_url: Optional[str],
++    api_key_env: Optional[str],
++    planner_style: str,
++    plan_source: str,
++    log_file,
++) -> tuple[list[str], Optional[str]]:
++    if not model_name or not base_url or not api_key_env:
++        return [], None
++    if not os.getenv(api_key_env):
++        print(f"Warning: {plan_source} planner skipped because {api_key_env} is not set.")
++        log_file.write(f"Warning: {plan_source} planner skipped because {api_key_env} is not set.\n")
++        return [], None
++
++    planned_steps = decompose_task_with_llm(
++        task_description,
++        model_name=model_name,
++        base_url=base_url,
++        api_key_env=api_key_env,
++        planner_style=planner_style,
++    )
++    if planned_steps:
++        return planned_steps, plan_source
++    return [], None
++
++
 +def build_plan_for_task(cfg: GenerateConfig, original_task_description: str, log_file) -> tuple[list[str], str]:
 +    if cfg.manual_plan:
 +        manual_steps = parse_manual_plan(cfg.manual_plan)
@@ -238,68 +440,250 @@ index 505db71..b75d28a 100644
 +            print(f"Warning: LLM planner import failed: {LLM_PLANNER_IMPORT_ERROR}")
 +            log_file.write(f"Warning: LLM planner import failed: {LLM_PLANNER_IMPORT_ERROR}\n")
 +        else:
-+            planned_steps = decompose_task_with_llm(
++            planned_steps, plan_source = call_llm_planner_for_task(
 +                original_task_description,
 +                model_name=cfg.llm_planner_model,
 +                base_url=cfg.llm_planner_base_url,
 +                api_key_env=cfg.llm_planner_api_key_env,
++                planner_style=cfg.llm_planner_style,
++                plan_source="llm_planner",
++                log_file=log_file,
 +            )
 +            if planned_steps:
-+                return planned_steps, "llm_planner"
++                return planned_steps, plan_source or "llm_planner"
++
++            fallback_steps, fallback_source = call_llm_planner_for_task(
++                original_task_description,
++                model_name=cfg.llm_planner_fallback_model,
++                base_url=cfg.llm_planner_fallback_base_url,
++                api_key_env=cfg.llm_planner_fallback_api_key_env,
++                planner_style=cfg.llm_planner_style,
++                plan_source="llm_planner_fallback",
++                log_file=log_file,
++            )
++            if fallback_steps:
++                return fallback_steps, fallback_source or "llm_planner_fallback"
 +            print("Warning: LLM planner returned no steps; falling back to original task.")
 +            log_file.write("Warning: LLM planner returned no steps.\n")
 +
 +    return [original_task_description], "original_task"
 +
 +
++def heuristic_stuck_detected(eef_positions: collections.deque, consecutive_failed_checks: int, cfg: GenerateConfig) -> bool:
++    if cfg.stuck_detection_mode != "heuristic":
++        return False
++    if consecutive_failed_checks < max(1, cfg.stuck_no_progress_checks):
++        return False
++    if len(eef_positions) < 2:
++        return True
++
++    positions = np.stack(list(eef_positions), axis=0)
++    displacement = np.max(np.linalg.norm(positions - positions[0], axis=1))
++    return displacement < cfg.stuck_eef_delta_threshold
++
++
++def get_recovery_lift_action(cfg: GenerateConfig) -> np.ndarray:
++    action = np.zeros(7, dtype=np.float32)
++    action[2] = cfg.recovery_lift_delta_z
++    action[-1] = -1.0
++    return action
++
++
++def run_recovery_lift(env, obs, cfg: GenerateConfig, resize_size, replay_images, log_file, t: int, max_t: int):
++    recovery_action = get_recovery_lift_action(cfg)
++    log_file.write(f"[t={t}] Recovery action: lift gripper for {cfg.recovery_lift_steps} steps.\n")
++    print(f"[t={t}] Recovery action: lift gripper for {cfg.recovery_lift_steps} steps.")
++
++    done = False
++    for _ in range(cfg.recovery_lift_steps):
++        if t >= max_t:
++            break
++        obs, reward, done, info = env.step(recovery_action.tolist())
++        try:
++            replay_images.append(get_libero_image(obs, resize_size))
++        except Exception as exc:
++            log_file.write(f"Warning: failed to append recovery frame: {exc}\n")
++        t += 1
++        if done:
++            break
++
++    return obs, done, t
++
++
++def check_subtask_completion(
++    cfg: GenerateConfig,
++    vlm_model,
++    vlm_processor,
++    image_pair_queue,
++    current_subtask_instruction: str,
++    env=None,
++    obs=None,
++) -> bool:
++    backend = cfg.vlm_verifier_backend.lower()
++    if backend == "libero_oracle":
++        if not ORACLE_VERIFIER_AVAILABLE:
++            print(f"Warning: LIBERO oracle verifier unavailable: {ORACLE_VERIFIER_IMPORT_ERROR}")
++            return False
++        if env is None:
++            print("Warning: LIBERO oracle verifier requested without env.")
++            return False
++        return check_completion_with_libero_oracle(
++            env=env,
++            obs=obs,
++            current_subtask_instruction=current_subtask_instruction,
++        )
++
++    if backend == "openai_api":
++        return check_completion_with_api_vlm(
++            image_pair_queue=image_pair_queue,
++            current_subtask_instruction=current_subtask_instruction,
++            model_name=cfg.api_vlm_model,
++            base_url=cfg.api_vlm_base_url,
++            api_key_env=cfg.api_vlm_api_key_env,
++        )
++
++    return check_completion_with_qwen_vl(
++        vlm_model=vlm_model,
++        vlm_processor=vlm_processor,
++        image_pair_queue=image_pair_queue,
++        current_subtask_instruction=current_subtask_instruction,
++    )
++
++
++def diagnose_stuck(cfg: GenerateConfig, vlm_model, vlm_processor, image_pair_queue, current_subtask_instruction: str) -> bool:
++    backend = cfg.vlm_verifier_backend.lower()
++    if backend == "libero_oracle":
++        return False
++
++    if backend == "openai_api":
++        return diagnose_stuck_with_api_vlm(
++            image_pair_queue=image_pair_queue,
++            current_subtask_instruction=current_subtask_instruction,
++            model_name=cfg.api_vlm_model,
++            base_url=cfg.api_vlm_base_url,
++            api_key_env=cfg.api_vlm_api_key_env,
++        )
++
++    return diagnose_stuck_with_qwen_vl(
++        vlm_model=vlm_model,
++        vlm_processor=vlm_processor,
++        image_pair_queue=image_pair_queue,
++        current_subtask_instruction=current_subtask_instruction,
++    )
++
++
++def get_executor_instruction(
++    cfg: GenerateConfig,
++    original_task_description: str,
++    current_subtask_instruction: str,
++    current_subtask_index: int,
++    task_plan: list[str],
++) -> str:
++    mode = cfg.executor_instruction_mode.lower()
++    if mode == "original":
++        return original_task_description
++    if mode == "original_after_first_switch" and current_subtask_index > 0:
++        return original_task_description
++    if mode == "subtask_with_original_context":
++        return f"{original_task_description}. Current step: {current_subtask_instruction}"
++    if mode == "subtask_with_progress_context":
++        if current_subtask_index <= 0:
++            return current_subtask_instruction
++        completed_steps = "; ".join(task_plan[:current_subtask_index])
++        return (
++            f"{original_task_description}. Completed steps: {completed_steps}. "
++            f"Current step: {current_subtask_instruction}"
++        )
++    if mode != "subtask" and mode != "original_after_first_switch":
++        print(f"Warning: unknown executor_instruction_mode '{cfg.executor_instruction_mode}', using subtask instruction.")
++    return current_subtask_instruction
++
++
  @draccus.wrap()
  def eval_libero(cfg: GenerateConfig) -> None:
      assert cfg.pretrained_checkpoint is not None, "cfg.pretrained_checkpoint must not be None!"
-@@ -111,17 +189,23 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -111,17 +401,49 @@ def eval_libero(cfg: GenerateConfig) -> None:
      if cfg.model_family == "openvla":
          vla_processor = get_processor(cfg) # Renamed for clarity
-
+ 
 -    # Load VLM model (Verifier V) - Load once before the loops
 +    # Load VLM model (Verifier V) only when explicitly enabled.
      vlm_model, vlm_processor = None, None
 -
 -    print("No VLM")
      VLM_ENABLED_EFFECTIVELY = False
--
+-    
 -    hardcoded_plan = [
 -        "put both the alphabet soup and the tomato sauce in the basket",
 -    ]
--
+-    
 -    print(f"使用硬编码计划进行测试: {hardcoded_plan}")
 +    if cfg.enable_vlm_verifier:
-+        if not VLM_AVAILABLE:
-+            print(f"Warning: VLM verifier requested but import failed: {VLM_IMPORT_ERROR}")
++        verifier_backend = cfg.vlm_verifier_backend.lower()
++        if verifier_backend == "openai_api":
++            if not API_VLM_AVAILABLE:
++                print(f"Warning: API VLM verifier requested but import failed: {API_VLM_IMPORT_ERROR}")
++            elif not os.getenv(cfg.api_vlm_api_key_env):
++                print(f"Warning: API VLM verifier requested but {cfg.api_vlm_api_key_env} is not set.")
++            else:
++                VLM_ENABLED_EFFECTIVELY = True
++                print(f"Using API VLM verifier backend with model {cfg.api_vlm_model}.")
++        elif verifier_backend == "libero_oracle":
++            if not ORACLE_VERIFIER_AVAILABLE:
++                print(f"Warning: LIBERO oracle verifier requested but import failed: {ORACLE_VERIFIER_IMPORT_ERROR}")
++            else:
++                VLM_ENABLED_EFFECTIVELY = True
++                print("Using LIBERO oracle verifier backend (diagnostic only; reads simulator predicates).")
++        elif verifier_backend == "qwen_local":
++            if not VLM_AVAILABLE:
++                print(f"Warning: VLM verifier requested but import failed: {VLM_IMPORT_ERROR}")
++            else:
++                vlm_model, vlm_processor = load_qwen_vl_model(
++                    model_id=cfg.vlm_model_id,
++                    device=cfg.vlm_device_map,
++                    attn_implementation=cfg.vlm_attn_implementation,
++                )
++                VLM_ENABLED_EFFECTIVELY = vlm_model is not None and vlm_processor is not None
++                if not VLM_ENABLED_EFFECTIVELY:
++                    print("Warning: VLM verifier requested but model/processor did not load.")
 +        else:
-+            vlm_model, vlm_processor = load_qwen_vl_model(
-+                model_id=cfg.vlm_model_id,
-+                device=cfg.vlm_device_map,
-+                attn_implementation=cfg.vlm_attn_implementation,
-+            )
-+            VLM_ENABLED_EFFECTIVELY = vlm_model is not None and vlm_processor is not None
-+            if not VLM_ENABLED_EFFECTIVELY:
-+                print("Warning: VLM verifier requested but model/processor did not load.")
++            print(f"Warning: unknown vlm_verifier_backend '{cfg.vlm_verifier_backend}'.")
 +    else:
 +        print("VLM verifier disabled; running OpenVLA executor baseline.")
-
++
++    if cfg.enable_vlm_verifier and not VLM_ENABLED_EFFECTIVELY:
++        if cfg.vlm_verifier_backend.lower() == "openai_api" and not API_VLM_AVAILABLE:
++            print(f"Warning: API VLM verifier unavailable: {API_VLM_IMPORT_ERROR}")
++        elif cfg.vlm_verifier_backend.lower() == "libero_oracle" and not ORACLE_VERIFIER_AVAILABLE:
++            print(f"Warning: LIBERO oracle verifier unavailable: {ORACLE_VERIFIER_IMPORT_ERROR}")
++        elif cfg.vlm_verifier_backend.lower() == "qwen_local" and not VLM_AVAILABLE:
++            print(f"Warning: VLM verifier requested but import failed: {VLM_IMPORT_ERROR}")
+ 
      # Initialize local logging
      run_id = f"PEV_V1-EVAL-{cfg.task_suite_name}-{cfg.model_family}-{DATE_TIME}" # Added PEV_V1 prefix
-@@ -132,7 +216,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -132,8 +454,20 @@ def eval_libero(cfg: GenerateConfig) -> None:
      log_file = open(local_log_filepath, "w")
      print(f"Logging to local log file: {local_log_filepath}")
      log_file.write(f"PEV V1 Evaluation Run\n")
 -    log_file.write(f"Hardcoded Plan: {hardcoded_plan}\n")
 +    log_file.write(f"LLM Planner Enabled: {cfg.use_llm_planner}\n")
++    log_file.write(f"LLM Planner Style: {cfg.llm_planner_style}\n")
 +    log_file.write(f"LLM Planner API Key Env: {cfg.llm_planner_api_key_env}\n")
++    log_file.write(f"LLM Planner Fallback API Key Env: {cfg.llm_planner_fallback_api_key_env}\n")
 +    log_file.write(f"Manual Plan: {cfg.manual_plan}\n")
      log_file.write(f"VLM Verification Enabled: {VLM_ENABLED_EFFECTIVELY}\n")
-
++    log_file.write(f"VLM Verifier Backend: {cfg.vlm_verifier_backend}\n")
++    log_file.write(f"API VLM Model: {cfg.api_vlm_model}\n")
++    log_file.write(f"API VLM API Key Env: {cfg.api_vlm_api_key_env}\n")
++    log_file.write(f"Stuck Detection Mode: {cfg.stuck_detection_mode}\n")
++    log_file.write(f"Recovery Max Attempts: {cfg.recovery_max_attempts}\n")
++    log_file.write(f"Executor Instruction Mode: {cfg.executor_instruction_mode}\n")
++    log_file.write(f"Verify On Env Success: {cfg.verify_on_env_success}\n")
++    log_file.write(f"VLM Completion Confirmations: {cfg.vlm_completion_confirmations}\n")
+ 
      frames_run_dir = None # Initialize here
-@@ -150,7 +236,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
+     if cfg.save_frames:
+@@ -150,7 +484,20 @@ def eval_libero(cfg: GenerateConfig) -> None:
              name=run_id,
              config=draccus.encode(cfg) # Log config
          )
@@ -307,15 +691,22 @@ index 505db71..b75d28a 100644
 +        wandb.config.update(
 +            {
 +                "use_llm_planner": cfg.use_llm_planner,
++                "llm_planner_style": cfg.llm_planner_style,
 +                "manual_plan": cfg.manual_plan,
 +                "vlm_enabled": VLM_ENABLED_EFFECTIVELY,
++                "vlm_verifier_backend": cfg.vlm_verifier_backend,
++                "stuck_detection_mode": cfg.stuck_detection_mode,
++                "recovery_max_attempts": cfg.recovery_max_attempts,
++                "executor_instruction_mode": cfg.executor_instruction_mode,
++                "verify_on_env_success": cfg.verify_on_env_success,
++                "vlm_completion_confirmations": cfg.vlm_completion_confirmations,
 +            }
 +        )
-
-
+ 
+ 
      # Initialize LIBERO task suite
-@@ -165,7 +257,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
-
+@@ -165,7 +512,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
      # Start evaluation
      total_episodes, total_successes = 0, 0
 -    for task_id in tqdm.tqdm(range(num_tasks_in_suite), desc="Tasks"):
@@ -323,9 +714,9 @@ index 505db71..b75d28a 100644
 +    for task_id in tqdm.tqdm(range(cfg.start_task_id, task_end), desc="Tasks"):
          # Get task
          task = task_suite.get_task(task_id)
-
-@@ -174,10 +267,19 @@ def eval_libero(cfg: GenerateConfig) -> None:
-
+ 
+@@ -174,10 +522,19 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
          # Initialize LIBERO environment and ORIGINAL task description
          env, original_task_description = get_libero_env(task, cfg.model_family, resolution=256)
 +        task_plan, plan_source = build_plan_for_task(cfg, original_task_description, log_file)
@@ -336,7 +727,7 @@ index 505db71..b75d28a 100644
 +        print(f"Plan source for task {task_id}: {plan_source}; plan: {task_plan}")
 +        log_file.write(f"Plan Source: {plan_source}\n")
 +        log_file.write(f"Plan: {task_plan}\n")
-
+ 
          # Start episodes
          task_episodes, task_successes = 0, 0
 -        for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task), desc=f"Task {task_id} Episodes", leave=False):
@@ -344,10 +735,10 @@ index 505db71..b75d28a 100644
 +        for episode_idx in tqdm.tqdm(range(cfg.start_episode_id, episode_end), desc=f"Task {task_id} Episodes", leave=False):
              print(f"\nTask: {original_task_description}")
              log_file.write(f"\nOriginal Task: {original_task_description}\n")
-
-@@ -188,18 +290,17 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
+@@ -188,18 +545,21 @@ def eval_libero(cfg: GenerateConfig) -> None:
              obs = env.set_init_state(initial_states[episode_idx])
-
+ 
              current_subtask_index = 0
 -            if not hardcoded_plan:
 +            if not task_plan:
@@ -361,139 +752,282 @@ index 505db71..b75d28a 100644
              print(f"Starting Episode {episode_idx+1} with Subtask 1: '{current_subtask_instruction}'")
              log_file.write(f"Episode {episode_idx+1} | Subtask {current_subtask_index+1}: {current_subtask_instruction}\n")
              plan_completed_by_vlm = False
-
+ 
 -            image_pair_queue = collections.deque(maxlen=1)
 +            image_pair_queue = collections.deque(maxlen=max(1, cfg.vlm_history_length))
-
++            eef_position_checkpoints = collections.deque(maxlen=max(2, cfg.stuck_no_progress_checks))
++            consecutive_failed_checks = 0
++            recovery_attempts = 0
++            consecutive_completion_checks = 0
+ 
              episode_frame_save_dir = None
              if cfg.save_frames and frames_run_dir: # Check frames_run_dir exists
-@@ -223,6 +324,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -223,6 +583,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
                  max_steps = 400
              else: # Fallback
                  max_steps = 400
 +            if cfg.max_steps_override is not None:
 +                max_steps = cfg.max_steps_override
-
+ 
              log_file.write(f"Starting episode run (max_steps={max_steps})...\n")
              while t < max_steps + cfg.num_steps_wait:
-@@ -231,13 +334,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -231,13 +593,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
                      if t < cfg.num_steps_wait:
                          obs, reward, done, info = env.step(get_libero_dummy_action(cfg.model_family))
-
--                        if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
+ 
+-                        if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0): 
 +                        if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
                               img_main_np_wait = get_libero_image(obs, resize_size)
                               img_eih_np_wait = obs["robot0_eye_in_hand_image"]
                               main_img_pil_wait = Image.fromarray(img_main_np_wait)
                               eih_img_pil_wait = Image.fromarray(img_eih_np_wait)
                               image_pair_queue.append((main_img_pil_wait, eih_img_pil_wait))
--
+-                    
 +
                          t += 1
                          continue
-
-@@ -264,16 +367,16 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
+@@ -264,16 +626,16 @@ def eval_libero(cfg: GenerateConfig) -> None:
                              print(f"Warning: Failed to save frame {t}. Error: {save_e}")
                              log_file.write(f"Warning: Failed to save frame {t}. Error: {save_e}\n")
-
--
+ 
+-                
 +
                      image_collected_this_step = False
--                    if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
+-                    if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0): 
 +                    if VLM_ENABLED_EFFECTIVELY and (t % 5 == 0):
                          image_collected_this_step = True
--
+-                        
 +
                          main_img_pil = Image.fromarray(img_main_np)
                          eih_img_pil = Image.fromarray(img_eih_np)
                          image_pair_queue.append((main_img_pil, eih_img_pil))
-
--
+ 
+-                        
 +
                          if cfg.save_frames and episode_frame_save_dir:
                               try:
                                   frame_filename = f"frame_{t:04d}.png"
-@@ -284,39 +387,39 @@ def eval_libero(cfg: GenerateConfig) -> None:
+@@ -284,39 +646,119 @@ def eval_libero(cfg: GenerateConfig) -> None:
                                   print(f"Warning: Failed to save frame {t}. Error: {save_e}")
                                   log_file.write(f"Warning: Failed to save frame {t}. Error: {save_e}\n")
-
--
+ 
+-                    
 +
                      vlm_check_this_step = False
--                    if VLM_ENABLED_EFFECTIVELY and (t % cfg.verify_frequency == 0):
+-                    if VLM_ENABLED_EFFECTIVELY and (t % cfg.verify_frequency == 0): 
 +                    if VLM_ENABLED_EFFECTIVELY and (t % cfg.verify_frequency == 0):
                           vlm_check_this_step = True
-
+ 
                      if vlm_check_this_step and not plan_completed_by_vlm:
--
+-                        
 +
                          print(f"[t={t}] Performing VLM check for subtask: '{current_subtask_instruction}' using queue (size {len(image_pair_queue)})")
                          log_file.write(f"[t={t}] VLM Check Start: '{current_subtask_instruction}' (Queue size: {len(image_pair_queue)})\n")
-
-                         is_subtask_complete = check_completion_with_qwen_vl(
++                        eef_position_checkpoints.append(np.array(obs["robot0_eef_pos"], dtype=np.float32))
+ 
+-                        is_subtask_complete = check_completion_with_qwen_vl(
++                        is_subtask_complete = check_subtask_completion(
++                            cfg=cfg,
                              vlm_model=vlm_model,
                              vlm_processor=vlm_processor,
--                            image_pair_queue=image_pair_queue,
+-                            image_pair_queue=image_pair_queue, 
+-                            current_subtask_instruction=current_subtask_instruction
 +                            image_pair_queue=image_pair_queue,
-                             current_subtask_instruction=current_subtask_instruction
++                            current_subtask_instruction=current_subtask_instruction,
++                            env=env,
++                            obs=obs,
                          )
-
+ 
                          log_file.write(f"[t={t}] VLM Check Result: {'Complete' if is_subtask_complete else 'Not Complete'}\n")
-
+ 
                          if is_subtask_complete:
--
-+
-                             print(f"[t={t}] VLM Confirmed: Subtask '{current_subtask_instruction}' COMPLETE.")
-                             current_subtask_index += 1
+-                            
+-                            print(f"[t={t}] VLM Confirmed: Subtask '{current_subtask_instruction}' COMPLETE.")
+-                            current_subtask_index += 1
 -                            if current_subtask_index < len(hardcoded_plan):
 -                                current_subtask_instruction = hardcoded_plan[current_subtask_index]
 -                                print(f"[t={t}] Switching to next subtask ({current_subtask_index + 1}/{len(hardcoded_plan)}): '{current_subtask_instruction}'")
-+                            if current_subtask_index < len(task_plan):
-+                                current_subtask_instruction = task_plan[current_subtask_index]
-+                                print(f"[t={t}] Switching to next subtask ({current_subtask_index + 1}/{len(task_plan)}): '{current_subtask_instruction}'")
-                                 log_file.write(f"[t={t}] VLM SWITCH -> Subtask {current_subtask_index+1}: {current_subtask_instruction}\n")
+-                                log_file.write(f"[t={t}] VLM SWITCH -> Subtask {current_subtask_index+1}: {current_subtask_instruction}\n")
++                            consecutive_completion_checks += 1
++                            required_confirmations = max(1, cfg.vlm_completion_confirmations)
++                            if consecutive_completion_checks < required_confirmations:
++                                log_file.write(
++                                    f"[t={t}] VLM Completion Pending: "
++                                    f"{consecutive_completion_checks}/{required_confirmations} confirmations.\n"
++                                )
++                                print(
++                                    f"[t={t}] VLM completion pending "
++                                    f"({consecutive_completion_checks}/{required_confirmations})."
++                                )
++                                is_subtask_complete = False
                              else:
 -                                print(f"[t={t}] VLM Confirmed: All {len(hardcoded_plan)} subtasks in the plan are complete.")
-+                                print(f"[t={t}] VLM Confirmed: All {len(task_plan)} subtasks in the plan are complete.")
-                                 log_file.write(f"[t={t}] VLM: Plan finished.\n")
-                                 plan_completed_by_vlm = True
-                                 print(f"[t={t}] Continuing execution with last subtask instruction: '{current_subtask_instruction}' until env done or max_steps.")
--
+-                                log_file.write(f"[t={t}] VLM: Plan finished.\n")
+-                                plan_completed_by_vlm = True
+-                                print(f"[t={t}] Continuing execution with last subtask instruction: '{current_subtask_instruction}' until env done or max_steps.")
+-                   
++                                consecutive_failed_checks = 0
++                                recovery_attempts = 0
++                                consecutive_completion_checks = 0
++                                eef_position_checkpoints.clear()
++                                image_pair_queue.clear()
++
++                                print(f"[t={t}] VLM Confirmed: Subtask '{current_subtask_instruction}' COMPLETE.")
++                                current_subtask_index += 1
++                                if current_subtask_index < len(task_plan):
++                                    current_subtask_instruction = task_plan[current_subtask_index]
++                                    print(f"[t={t}] Switching to next subtask ({current_subtask_index + 1}/{len(task_plan)}): '{current_subtask_instruction}'")
++                                    log_file.write(f"[t={t}] VLM SWITCH -> Subtask {current_subtask_index+1}: {current_subtask_instruction}\n")
++                                else:
++                                    print(f"[t={t}] VLM Confirmed: All {len(task_plan)} subtasks in the plan are complete.")
++                                    log_file.write(f"[t={t}] VLM: Plan finished.\n")
++                                    plan_completed_by_vlm = True
++                                    print(f"[t={t}] Continuing execution with last subtask instruction: '{current_subtask_instruction}' until env done or max_steps.")
++                        else:
++                            consecutive_completion_checks = 0
++                            consecutive_failed_checks += 1
++                            stuck_detected = False
++                            if cfg.stuck_detection_mode == "vlm":
++                                if consecutive_failed_checks >= max(1, cfg.stuck_no_progress_checks):
++                                    stuck_detected = diagnose_stuck(
++                                        cfg=cfg,
++                                        vlm_model=vlm_model,
++                                        vlm_processor=vlm_processor,
++                                        image_pair_queue=image_pair_queue,
++                                        current_subtask_instruction=current_subtask_instruction,
++                                    )
++                            elif cfg.stuck_detection_mode == "heuristic":
++                                stuck_detected = heuristic_stuck_detected(
++                                    eef_position_checkpoints,
++                                    consecutive_failed_checks,
++                                    cfg,
++                                )
++                            elif cfg.stuck_detection_mode != "none":
++                                print(f"Warning: unknown stuck_detection_mode '{cfg.stuck_detection_mode}', disabling stuck detection.")
++                                log_file.write(f"Warning: unknown stuck_detection_mode '{cfg.stuck_detection_mode}'.\n")
++
++                            log_file.write(
++                                f"[t={t}] Stuck Diagnosis: {'Stuck' if stuck_detected else 'StillTrying'} "
++                                f"(failed_checks={consecutive_failed_checks}, recovery_attempts={recovery_attempts})\n"
++                            )
++
++                            if stuck_detected:
++                                recovery_attempts += 1
++                                if recovery_attempts > cfg.recovery_max_attempts:
++                                    print(f"[t={t}] Recovery limit exceeded for subtask '{current_subtask_instruction}'.")
++                                    log_file.write(f"[t={t}] Recovery limit exceeded; marking episode failed.\n")
++                                    done = False
++                                    break
++
++                                obs, recovery_done, t = run_recovery_lift(
++                                    env=env,
++                                    obs=obs,
++                                    cfg=cfg,
++                                    resize_size=resize_size,
++                                    replay_images=replay_images,
++                                    log_file=log_file,
++                                    t=t,
++                                    max_t=max_steps + cfg.num_steps_wait,
++                                )
++                                image_pair_queue.clear()
++                                eef_position_checkpoints.clear()
++                                consecutive_failed_checks = 0
++
++                                if recovery_done:
++                                    task_successes += 1
++                                    total_successes += 1
++                                    done = True
++                                    print(f"[t={t}] Environment signaled DONE during recovery (Success!).")
++                                    log_file.write(f"[t={t}] Environment DONE signal received during recovery.\n")
++                                    break
++                                continue
 +
                      # Save main image for replay video (use the already processed img_main_np)
                      replay_images.append(img_main_np)
-
-@@ -328,7 +431,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
+@@ -328,16 +770,22 @@ def eval_libero(cfg: GenerateConfig) -> None:
                          ),
                      }
-
--
+ 
+-                    
++                    executor_instruction = get_executor_instruction(
++                        cfg=cfg,
++                        original_task_description=original_task_description,
++                        current_subtask_instruction=current_subtask_instruction,
++                        current_subtask_index=current_subtask_index,
++                        task_plan=task_plan,
++                    )
 +
                      action = get_action(
                          cfg,
                          vla_model, # Use VLA model
-@@ -337,7 +440,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
-                         current_subtask_instruction,
+                         observation,
+-                        # Use the current subtask instruction, NOT original_task_description
+-                        current_subtask_instruction,
++                        executor_instruction,
                          vla_processor, # Use VLA processor
                      )
--
+-                    
 +
-
+ 
                      # Normalize gripper action
                      action = normalize_gripper_action(action, binarize=True)
-@@ -446,13 +549,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
-
-
+@@ -352,6 +800,41 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
+                     # --- Check Environment Done (Original Success Condition) ---
+                     if done:
++                        final_img_main_np = None
++                        final_img_eih_np = None
++                        try:
++                            final_img_main_np = get_libero_image(obs, resize_size)
++                            final_img_eih_np = obs["robot0_eye_in_hand_image"]
++                            replay_images.append(final_img_main_np)
++                        except Exception as exc:
++                            log_file.write(f"Warning: failed to append final success frame: {exc}\n")
++                        if cfg.verify_on_env_success and VLM_ENABLED_EFFECTIVELY and not plan_completed_by_vlm:
++                            if final_img_main_np is not None and final_img_eih_np is not None:
++                                image_pair_queue.append(
++                                    (Image.fromarray(final_img_main_np), Image.fromarray(final_img_eih_np))
++                                )
++                            log_file.write(
++                                f"[t={t}] Final VLM Check Start: '{current_subtask_instruction}' "
++                                f"(Queue size: {len(image_pair_queue)})\n"
++                            )
++                            final_subtask_complete = check_subtask_completion(
++                                cfg=cfg,
++                                vlm_model=vlm_model,
++                                vlm_processor=vlm_processor,
++                                image_pair_queue=image_pair_queue,
++                                current_subtask_instruction=current_subtask_instruction,
++                                env=env,
++                                obs=obs,
++                            )
++                            log_file.write(
++                                f"[t={t}] Final VLM Check Result: "
++                                f"{'Complete' if final_subtask_complete else 'Not Complete'}\n"
++                            )
++                            if final_subtask_complete:
++                                current_subtask_index += 1
++                                if current_subtask_index >= len(task_plan):
++                                    plan_completed_by_vlm = True
++                                    log_file.write(f"[t={t}] VLM: Plan finished on env success.\n")
+                         task_successes += 1
+                         total_successes += 1
+                         print(f"[t={t}] Environment signaled DONE (Success!).")
+@@ -446,13 +929,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
+ 
+ 
  if __name__ == "__main__":
--
+-    
 +
      print(f"Start: {time.strftime('%Y-%m-%d %H:%M:%S')}")
--    start_time = time.perf_counter()
+-    start_time = time.perf_counter() 
 +    start_time = time.perf_counter()
-
+ 
      eval_libero()
-
--    end_time = time.perf_counter()
+ 
+-    end_time = time.perf_counter() 
 +    end_time = time.perf_counter()
      duration = end_time - start_time
      print(f"\n end: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -501,29 +1035,23 @@ index 505db71..b75d28a 100644
 \ No newline at end of file
 +    print(f"eval_libero total_time: {duration:.2f} seconds")
 diff --git a/experiments/robot/libero/qwenvl.py b/experiments/robot/libero/qwenvl.py
-index 9a86c5b..e5393be 100644
+index 9a86c5b..a133cdc 100644
 --- a/experiments/robot/libero/qwenvl.py
 +++ b/experiments/robot/libero/qwenvl.py
-@@ -3,32 +3,55 @@
+@@ -3,32 +3,203 @@
  import torch
  from PIL import Image
  import numpy as np
 -from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 +from transformers import AutoProcessor
  import traceback
--import collections
--
+-import collections 
++import collections
+ 
 -# 尝试导入 Qwen-VL 官方提供的工具函数 (保持不变)
 -from qwen_vl_utils import process_vision_info
 -QWEN_UTILS_AVAILABLE = True
 -print("Successfully imported qwen_vl_utils.process_vision_info.")
--
--
--def load_qwen_vl_model(model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct", device: str = "auto"):
--
--    print(f"Attempting to load VLM model: {model_id} to device: {device} (using Flash Attention 2)")
-+import collections
-+
 +try:
 +    from qwen_vl_utils import process_vision_info
 +    QWEN_UTILS_AVAILABLE = True
@@ -533,6 +1061,156 @@ index 9a86c5b..e5393be 100644
 +    process_vision_info = None
 +    QWEN_UTILS_AVAILABLE = False
 +    QWEN_UTILS_IMPORT_ERROR = exc
+ 
+ 
+-def load_qwen_vl_model(model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct", device: str = "auto"):
++def _extract_object_and_location(current_subtask_instruction: str) -> tuple[str, str, str]:
++    object_name = "the object"
++    location_name = "the target location"
++    instruction_lower = current_subtask_instruction.lower()
++    verb = ""
++    object_part_raw = ""
+ 
+-    print(f"Attempting to load VLM model: {model_id} to device: {device} (using Flash Attention 2)")
++    if instruction_lower.startswith("pick up") and (" and place " in instruction_lower or " and put " in instruction_lower):
++        rest = current_subtask_instruction.split("pick up", 1)[1].strip().rstrip(".")
++        connector = " and place " if " and place " in instruction_lower else " and put "
++        picked_obj, place_tail = rest.split(connector, 1)
++        object_name = picked_obj.strip() if picked_obj.strip() else object_name
++        for separator in [" into ", " onto ", " in ", " on "]:
++            if place_tail.startswith(separator.strip() + " "):
++                location_name = f"{separator.strip()} {place_tail[len(separator.strip()):].strip()}"
++                return "place", object_name, location_name
++            if separator in place_tail:
++                placed_obj, loc_temp = place_tail.split(separator, 1)
++                placed_obj = placed_obj.strip()
++                if placed_obj and placed_obj.lower() != "it":
++                    object_name = placed_obj
++                location_name = f"{separator.strip()} {loc_temp.strip()}" if loc_temp.strip() else location_name
++                return "place", object_name, location_name
++        return "complete_task", object_name, location_name
++
++    if instruction_lower.startswith("pick up"):
++        verb = "pick up"
++        try:
++            object_part_raw = current_subtask_instruction.split(verb, 1)[1].strip().rstrip(".")
++        except Exception:
++            pass
++        object_name = object_part_raw if object_part_raw else object_name
++    elif instruction_lower.startswith("place") or instruction_lower.startswith("put"):
++        verb = "place"
++        source_verb = "place" if instruction_lower.startswith("place") else "put"
++        try:
++            object_part_raw = current_subtask_instruction.split(source_verb, 1)[1].strip().rstrip(".")
++        except Exception:
++            pass
++        split_success = False
++        for separator in [" into ", " onto ", " in ", " on "]:
++            if separator in object_part_raw:
++                obj_temp, loc_temp = object_part_raw.split(separator, 1)
++                object_name = obj_temp.strip() if obj_temp.strip() else object_name
++                location_name = f"{separator.strip()} {loc_temp.strip()}" if loc_temp.strip() else location_name
++                split_success = True
++                break
++        if not split_success:
++            object_name = object_part_raw if object_part_raw else object_name
++
++    return verb, object_name, location_name
++
++
++def _generate_qwen_vl_response(
++    vlm_model,
++    vlm_processor,
++    image_pair_queue: collections.deque,
++    prompt_text: str,
++    max_new_tokens: int = 10,
++) -> str | None:
++    content_list = []
++    for i, (main_img_pil, eih_img_pil) in enumerate(image_pair_queue):
++        content_list.append({"type": "text", "text": f"Image Pair {i + 1} (Main View):"})
++        content_list.append({"type": "image", "image": main_img_pil})
++        content_list.append({"type": "text", "text": f"Image Pair {i + 1} (Hand View):"})
++        content_list.append({"type": "image", "image": eih_img_pil})
++
++    content_list.append({"type": "text", "text": prompt_text})
++    messages = [{"role": "user", "content": content_list}]
++
++    text_template = vlm_processor.apply_chat_template(
++        messages, tokenize=False, add_generation_prompt=True
++    )
++    image_inputs, video_inputs = process_vision_info(messages)
++    if image_inputs is None:
++        print("[VLM Check] Error: process_vision_info failed to process image inputs.")
++        return None
++
++    inputs = vlm_processor(
++        text=[text_template],
++        images=image_inputs,
++        videos=video_inputs,
++        padding=True,
++        return_tensors="pt",
++    ).to(vlm_model.device)
++
++    with torch.no_grad():
++        generated_ids = vlm_model.generate(
++            **inputs,
++            max_new_tokens=max_new_tokens,
++            min_new_tokens=1,
++            do_sample=False,
++            pad_token_id=vlm_processor.tokenizer.eos_token_id,
++        )
++
++    generated_ids_trimmed = [
++        out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
++    ]
++    response = vlm_processor.batch_decode(
++        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
++    )
++    return response[0].strip() if response else None
++
++
++def _target_hint(location_name: str) -> str:
++    location_lower = location_name.lower()
++    if "stove" in location_lower:
++        return " For stove targets, the target area is the square stove unit's circular burner pad."
++    if "basket" in location_lower:
++        return (
++            " For basket targets, the basket is the wicker basket with a white cloth liner. "
++            "The object counts as in the basket if it is inside the basket's open interior or crossing below/within "
++            "the basket rim while being placed into it, even if the gripper still touches it."
++        )
++    if "caddy" in location_lower:
++        return (
++            " For caddy targets, the caddy is the desk organizer with separate compartments. "
++            "The back compartment is a rear/back slot of the caddy. The object may be partly hidden inside "
++            "the slot or visually blend with the dark caddy walls; count it as placed if it is inside the "
++            "target slot and no longer on the table or held by the gripper."
++        )
++    if "drawer" in location_lower or "cabinet" in location_lower:
++        return (
++            " For cabinet drawer targets, judge the named drawer region of the white cabinet. "
++            "The bottom drawer is the lowest open compartment."
++        )
++    return ""
++
++
++def _object_hint(object_name: str) -> str:
++    object_lower = object_name.lower()
++    if "tomato sauce" in object_lower:
++        return (
++            " In LIBERO, tomato sauce is the red-and-green cylindrical can with tomato pictures; "
++            "do not confuse it with other bottles or boxes on the table."
++        )
++    if "alphabet soup" in object_lower:
++        return (
++            " In LIBERO, alphabet soup is the blue-and-orange cylindrical soup can; "
++            "do not confuse it with the red-and-green tomato sauce can or other packages."
++        )
++    if "book" in object_lower:
++        return " In LIBERO, the book is the flat black book."
++    if "black bowl" in object_lower:
++        return " In LIBERO, the black bowl is a small dark bowl."
++    return ""
 +
 +
 +def load_qwen_vl_model(
@@ -576,104 +1254,639 @@ index 9a86c5b..e5393be 100644
      except Exception as e:
          print(f"Error: Failed to load VLM model/processor: {e}")
          traceback.print_exc()
-@@ -38,8 +61,8 @@ def load_qwen_vl_model(model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct", device: st
+@@ -38,8 +209,8 @@ def load_qwen_vl_model(model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct", device: st
  def check_completion_with_qwen_vl(
      vlm_model,
      vlm_processor,
--
--    image_pair_queue: collections.deque,
+-  
+-    image_pair_queue: collections.deque, 
 +
 +    image_pair_queue: collections.deque,
-
+ 
      current_subtask_instruction: str
  ) -> bool:
-@@ -55,16 +78,16 @@ def check_completion_with_qwen_vl(
+@@ -55,110 +226,41 @@ def check_completion_with_qwen_vl(
          print("[VLM Check] Error: VLM model or processor not loaded.")
          return False
      if not QWEN_UTILS_AVAILABLE:
 -        print("[VLM Check] Error: qwen_vl_utils not available.")
 +        print(f"[VLM Check] Error: qwen_vl_utils not available: {QWEN_UTILS_IMPORT_ERROR}")
          return False
--
+-    
 +
      if not image_pair_queue:
          print("[VLM Check] Warning: Image queue is empty. Cannot perform check.")
          return False
--
+-    
 +
-
+ 
      try:
+-        
 -
-+
-
-         object_name = "the object" # Default English names
-         location_name = "the target location"
-@@ -76,9 +99,10 @@ def check_completion_with_qwen_vl(
-             try: object_part_raw = current_subtask_instruction.split(verb, 1)[1].strip().rstrip('.')
-             except: pass
-             object_name = object_part_raw if object_part_raw else object_name
--        elif instruction_lower.startswith("place"):
-+        elif instruction_lower.startswith("place") or instruction_lower.startswith("put"):
-             verb = "place"
+-        object_name = "the object" # Default English names
+-        location_name = "the target location"
+-        instruction_lower = current_subtask_instruction.lower()
+-        verb = ""
+-        object_part_raw = ""
+-        if instruction_lower.startswith("pick up"):
+-            verb = "pick up"
 -            try: object_part_raw = current_subtask_instruction.split(verb, 1)[1].strip().rstrip('.')
-+            source_verb = "place" if instruction_lower.startswith("place") else "put"
-+            try: object_part_raw = current_subtask_instruction.split(source_verb, 1)[1].strip().rstrip('.')
-             except: pass
-             split_success = False
-             # Use English prepositions
-@@ -90,31 +114,31 @@ def check_completion_with_qwen_vl(
-                     split_success = True
-                     break
-             if not split_success: object_name = object_part_raw if object_part_raw else object_name
--
+-            except: pass
+-            object_name = object_part_raw if object_part_raw else object_name
+-        elif instruction_lower.startswith("place"):
+-            verb = "place"
+-            try: object_part_raw = current_subtask_instruction.split(verb, 1)[1].strip().rstrip('.')
+-            except: pass
+-            split_success = False
+-            # Use English prepositions
+-            for separator in [" in ", " on ", " into ", " onto "]:
+-                if separator in object_part_raw:
+-                    obj_temp, loc_temp = object_part_raw.split(separator, 1)
+-                    object_name = obj_temp.strip() if obj_temp.strip() else object_name
+-                    location_name = loc_temp.strip() if loc_temp.strip() else location_name
+-                    split_success = True
+-                    break
+-            if not split_success: object_name = object_part_raw if object_part_raw else object_name
+-        
++        verb, object_name, location_name = _extract_object_and_location(current_subtask_instruction)
 +
          prompt_text = ""
--
+-       
+-        prompt_prefix = f"Observe the following sequence of {len(image_pair_queue)} image pairs (main view and hand view over time). The instruction for the robot is: '{current_subtask_instruction}'. "
 +
-         prompt_prefix = f"Observe the following sequence of {len(image_pair_queue)} image pairs (main view and hand view over time). The instruction for the robot is: '{current_subtask_instruction}'. "
-
++        prompt_prefix = f"Observe the following sequence of {len(image_pair_queue)} image pairs (main view and hand view over time). The instruction for the robot is: '{current_subtask_instruction}'.{_object_hint(object_name)} "
+ 
          if verb == "pick up":
--
+-            
+-            prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been securely grasped by the gripper and clearly lifted off any surface it was resting on by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
 +
-             prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been securely grasped by the gripper and clearly lifted off any surface it was resting on by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
++            prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been picked up by the gripper by the end of the sequence? Answer Yes if the object is held/carried by the gripper and is no longer resting flat at its original surface, even if the gripper partially occludes it. Answer No if it is still lying on the table or only being touched. Please answer strictly with 'Yes' or 'No'."
          elif verb == "place":
--
+-            
+-            prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been stably placed {location_name} (e.g., 'in the basket', 'on the table'), and does the gripper appear empty or clearly moving away from the object by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
 +
-             prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been stably placed {location_name} (e.g., 'in the basket', 'on the table'), and does the gripper appear empty or clearly moving away from the object by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
++            target_hint = _target_hint(location_name)
++            prompt_text = f"{prompt_prefix}Based *only* on the image sequence, has '{object_name}' been stably placed {location_name} by the end of the sequence?{target_hint} Answer Yes only if the object is directly at the target location, not beside it or merely near it. The gripper may still touch the object. Focus on the final object pose and target relation. Please answer strictly with 'Yes' or 'No'."
          else:
--
+-           
 +
              prompt_text = f"{prompt_prefix}Based *only* on the image sequence and the instruction, has this action been successfully completed by the end of the sequence? Please answer strictly with 'Yes' or 'No'."
+-        
 -
-+
-
-         content_list = []
+-        content_list = []
+-        
+-        for i, (main_img_pil, eih_img_pil) in enumerate(image_pair_queue):
+-            content_list.append({"type": "text", "text": f"Image Pair {i+1} (Main View):"})
+-            content_list.append({"type": "image", "image": main_img_pil})
+-            content_list.append({"type": "text", "text": f"Image Pair {i+1} (Hand View):"})
+-            content_list.append({"type": "image", "image": eih_img_pil})
 -
-+
-         for i, (main_img_pil, eih_img_pil) in enumerate(image_pair_queue):
-             content_list.append({"type": "text", "text": f"Image Pair {i+1} (Main View):"})
-             content_list.append({"type": "image", "image": main_img_pil})
-             content_list.append({"type": "text", "text": f"Image Pair {i+1} (Hand View):"})
-             content_list.append({"type": "image", "image": eih_img_pil})
-
+-        
+-        content_list.append({"type": "text", "text": prompt_text})
 -
-+
-         content_list.append({"type": "text", "text": prompt_text})
-
-         messages = [
-@@ -123,7 +147,7 @@ def check_completion_with_qwen_vl(
-                 "content": content_list,
-             }
-         ]
+-        messages = [
+-            {
+-                "role": "user",
+-                "content": content_list,
+-            }
+-        ]
+-        
+-        text_template = vlm_processor.apply_chat_template(
+-            messages, tokenize=False, add_generation_prompt=True
+-        )
+-        image_inputs, video_inputs = process_vision_info(messages)
+-        if image_inputs is None:
+-             print("[VLM Check] Error: process_vision_info failed to process image inputs.")
+-             return False
 -
-+
-         text_template = vlm_processor.apply_chat_template(
-             messages, tokenize=False, add_generation_prompt=True
-         )
-@@ -175,4 +199,4 @@ def check_completion_with_qwen_vl(
+-        inputs = vlm_processor(
+-            text=[text_template],
+-            images=image_inputs,
+-            videos=video_inputs,
+-            padding=True,
+-            return_tensors="pt",
+-        ).to(vlm_model.device)
+-
+-        with torch.no_grad():
+-            generated_ids = vlm_model.generate(
+-                **inputs,
+-                max_new_tokens=10, # Still expect short Yes/No
+-                min_new_tokens=1,
+-                do_sample=False,
+-                pad_token_id=vlm_processor.tokenizer.eos_token_id # Corrected access
+-            )
+-
+-        generated_ids_trimmed = [
+-            out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+-        ]
+-        response = vlm_processor.batch_decode(
+-            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+-        )
+ 
+-        if response:
+-            vlm_response_text = response[0].strip()
+-            # print(f"[VLM Check] VLM raw response: '{vlm_response_text}'") # Debug
++        vlm_response_text = _generate_qwen_vl_response(
++            vlm_model=vlm_model,
++            vlm_processor=vlm_processor,
++            image_pair_queue=image_pair_queue,
++            prompt_text=prompt_text,
++            max_new_tokens=10,
++        )
++        if vlm_response_text:
++            print(f"[VLM Check] Raw response: '{vlm_response_text}'")
+ 
+             # Be a bit lenient: check lower case and potential starting variations
+             if vlm_response_text.lower().startswith("yes"):
+@@ -175,4 +277,45 @@ def check_completion_with_qwen_vl(
      except Exception as e:
          print(f"Error: Exception during VLM check (Instruction: '{current_subtask_instruction}'): {e}")
          traceback.print_exc()
 -        return False
 \ No newline at end of file
 +        return False
++
++
++def diagnose_stuck_with_qwen_vl(
++    vlm_model,
++    vlm_processor,
++    image_pair_queue: collections.deque,
++    current_subtask_instruction: str,
++) -> bool:
++    if vlm_model is None or vlm_processor is None:
++        print("[VLM Diagnose] Error: VLM model or processor not loaded.")
++        return False
++    if not QWEN_UTILS_AVAILABLE:
++        print(f"[VLM Diagnose] Error: qwen_vl_utils not available: {QWEN_UTILS_IMPORT_ERROR}")
++        return False
++    if not image_pair_queue:
++        print("[VLM Diagnose] Warning: Image queue is empty. Cannot diagnose stuck state.")
++        return False
++
++    try:
++        prompt_text = (
++            f"Observe the image sequence for the robot executing: '{current_subtask_instruction}'. "
++            "Is the robot clearly stuck rather than still making useful progress? "
++            "Examples of stuck include a stationary arm, a failed grasp, repeated oscillation, collision with the table, "
++            "or no visible progress toward the subgoal across the sequence. "
++            "Answer strictly with 'Stuck' or 'StillTrying'."
++        )
++        vlm_response_text = _generate_qwen_vl_response(
++            vlm_model=vlm_model,
++            vlm_processor=vlm_processor,
++            image_pair_queue=image_pair_queue,
++            prompt_text=prompt_text,
++            max_new_tokens=12,
++        )
++        if not vlm_response_text:
++            return False
++        print(f"[VLM Diagnose] Raw response: '{vlm_response_text}'")
++        return vlm_response_text.strip().lower().startswith("stuck")
++    except Exception as e:
++        print(f"Error: Exception during VLM stuck diagnosis (Instruction: '{current_subtask_instruction}'): {e}")
++        traceback.print_exc()
++        return False
+diff --git a/experiments/robot/libero/api_vlm.py b/experiments/robot/libero/api_vlm.py
+new file mode 100644
+index 0000000..747b32d
+--- /dev/null
++++ b/experiments/robot/libero/api_vlm.py
+@@ -0,0 +1,242 @@
++import base64
++import collections
++import io
++import os
++import traceback
++
++from PIL import Image
++
++from ds import normalize_openai_base_url
++
++
++def _extract_object_and_location(current_subtask_instruction: str) -> tuple[str, str, str]:
++    object_name = "the object"
++    location_name = "the target location"
++    instruction_lower = current_subtask_instruction.lower()
++    verb = ""
++    object_part_raw = ""
++
++    if instruction_lower.startswith("pick up") and (" and place " in instruction_lower or " and put " in instruction_lower):
++        rest = current_subtask_instruction.split("pick up", 1)[1].strip().rstrip(".")
++        connector = " and place " if " and place " in instruction_lower else " and put "
++        picked_obj, place_tail = rest.split(connector, 1)
++        object_name = picked_obj.strip() if picked_obj.strip() else object_name
++        for separator in [" into ", " onto ", " in ", " on "]:
++            if place_tail.startswith(separator.strip() + " "):
++                location_name = f"{separator.strip()} {place_tail[len(separator.strip()):].strip()}"
++                return "place", object_name, location_name
++            if separator in place_tail:
++                placed_obj, loc_temp = place_tail.split(separator, 1)
++                placed_obj = placed_obj.strip()
++                if placed_obj and placed_obj.lower() != "it":
++                    object_name = placed_obj
++                location_name = f"{separator.strip()} {loc_temp.strip()}" if loc_temp.strip() else location_name
++                return "place", object_name, location_name
++        return "complete_task", object_name, location_name
++
++    if instruction_lower.startswith("pick up"):
++        verb = "pick up"
++        try:
++            object_part_raw = current_subtask_instruction.split(verb, 1)[1].strip().rstrip(".")
++        except Exception:
++            pass
++        object_name = object_part_raw if object_part_raw else object_name
++    elif instruction_lower.startswith("place") or instruction_lower.startswith("put"):
++        verb = "place"
++        source_verb = "place" if instruction_lower.startswith("place") else "put"
++        try:
++            object_part_raw = current_subtask_instruction.split(source_verb, 1)[1].strip().rstrip(".")
++        except Exception:
++            pass
++        split_success = False
++        for separator in [" into ", " onto ", " in ", " on "]:
++            if separator in object_part_raw:
++                obj_temp, loc_temp = object_part_raw.split(separator, 1)
++                object_name = obj_temp.strip() if obj_temp.strip() else object_name
++                location_name = f"{separator.strip()} {loc_temp.strip()}" if loc_temp.strip() else location_name
++                split_success = True
++                break
++        if not split_success:
++            object_name = object_part_raw if object_part_raw else object_name
++
++    return verb, object_name, location_name
++
++
++def _pil_to_data_url(image: Image.Image) -> str:
++    image_rgb = image.convert("RGB")
++    buffer = io.BytesIO()
++    image_rgb.save(buffer, format="PNG")
++    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
++    return f"data:image/png;base64,{encoded}"
++
++
++def _target_hint(location_name: str) -> str:
++    location_lower = location_name.lower()
++    if "stove" in location_lower:
++        return " For stove targets, the target area is the square stove unit's circular burner pad."
++    if "basket" in location_lower:
++        return (
++            " For basket targets, the basket is the wicker basket with a white cloth liner. "
++            "The object counts as in the basket if it is inside the basket's open interior or crossing below/within "
++            "the basket rim while being placed into it, even if the gripper still touches it."
++        )
++    if "caddy" in location_lower:
++        return (
++            " For caddy targets, the caddy is the desk organizer with separate compartments. "
++            "The back compartment is a rear/back slot of the caddy. The object may be partly hidden inside "
++            "the slot or visually blend with the dark caddy walls; count it as placed if it is inside the "
++            "target slot and no longer on the table or held by the gripper."
++        )
++    if "drawer" in location_lower or "cabinet" in location_lower:
++        return (
++            " For cabinet drawer targets, judge the named drawer region of the white cabinet. "
++            "The bottom drawer is the lowest open compartment."
++        )
++    return ""
++
++
++def _object_hint(object_name: str) -> str:
++    object_lower = object_name.lower()
++    if "tomato sauce" in object_lower:
++        return (
++            " In LIBERO, tomato sauce is the red-and-green cylindrical can with tomato pictures; "
++            "do not confuse it with other bottles or boxes on the table."
++        )
++    if "alphabet soup" in object_lower:
++        return (
++            " In LIBERO, alphabet soup is the blue-and-orange cylindrical soup can; "
++            "do not confuse it with the red-and-green tomato sauce can or other packages."
++        )
++    if "book" in object_lower:
++        return " In LIBERO, the book is the flat black book."
++    if "black bowl" in object_lower:
++        return " In LIBERO, the black bowl is a small dark bowl."
++    return ""
++
++
++def _call_api_vlm(
++    image_pair_queue: collections.deque,
++    prompt_text: str,
++    model_name: str,
++    base_url: str,
++    api_key_env: str,
++    max_tokens: int,
++) -> str | None:
++    if not image_pair_queue:
++        print("[API VLM] Warning: image queue is empty.")
++        return None
++
++    api_key = os.getenv(api_key_env)
++    if not api_key:
++        print(f"[API VLM] Warning: {api_key_env} is not set.")
++        return None
++
++    try:
++        from openai import OpenAI
++    except ImportError:
++        print("[API VLM] Error: openai package is not installed.")
++        return None
++
++    content = []
++    for i, (main_img_pil, eih_img_pil) in enumerate(image_pair_queue):
++        content.append({"type": "text", "text": f"Image Pair {i + 1} (Main View):"})
++        content.append({"type": "image_url", "image_url": {"url": _pil_to_data_url(main_img_pil)}})
++        content.append({"type": "text", "text": f"Image Pair {i + 1} (Hand View):"})
++        content.append({"type": "image_url", "image_url": {"url": _pil_to_data_url(eih_img_pil)}})
++    content.append({"type": "text", "text": prompt_text})
++
++    try:
++        client = OpenAI(api_key=api_key, base_url=normalize_openai_base_url(base_url))
++        response = client.chat.completions.create(
++            model=model_name,
++            messages=[{"role": "user", "content": content}],
++            max_tokens=max_tokens,
++            temperature=0,
++        )
++        if not response.choices:
++            return None
++        message = response.choices[0].message
++        return message.content.strip() if message.content else None
++    except Exception as exc:
++        print(f"[API VLM] Error during request: {exc}")
++        traceback.print_exc()
++        return None
++
++
++def check_completion_with_api_vlm(
++    image_pair_queue: collections.deque,
++    current_subtask_instruction: str,
++    model_name: str,
++    base_url: str,
++    api_key_env: str,
++) -> bool:
++    verb, object_name, location_name = _extract_object_and_location(current_subtask_instruction)
++    prompt_prefix = (
++        f"Observe the following sequence of {len(image_pair_queue)} image pairs "
++        f"(main view and hand view over time). The instruction for the robot is: "
++        f"'{current_subtask_instruction}'.{_object_hint(object_name)} "
++    )
++
++    if verb == "pick up":
++        prompt_text = (
++            f"{prompt_prefix}Based only on the image sequence, has '{object_name}' been picked up by the gripper "
++            "by the end of the sequence? Answer Yes if the object is held/carried by the gripper and is no longer "
++            "resting flat at its original surface, even if the gripper partially occludes it. Answer No if it is "
++            "still lying on the table or only being touched. "
++            "Answer strictly with 'Yes' or 'No'."
++        )
++    elif verb == "place":
++        target_hint = _target_hint(location_name)
++        prompt_text = (
++            f"{prompt_prefix}Based only on the image sequence, has '{object_name}' been stably placed "
++            f"{location_name} by the end of the sequence?{target_hint} Answer Yes only if the object is directly "
++            "at the target location, not beside it or merely near it. The gripper may still touch the object. "
++            "Focus on the final object pose and target relation. Answer strictly with 'Yes' or 'No'."
++        )
++    else:
++        prompt_text = (
++            f"{prompt_prefix}Based only on the image sequence and the instruction, has this action been "
++            "successfully completed by the end of the sequence? Answer strictly with 'Yes' or 'No'."
++        )
++
++    response_text = _call_api_vlm(
++        image_pair_queue=image_pair_queue,
++        prompt_text=prompt_text,
++        model_name=model_name,
++        base_url=base_url,
++        api_key_env=api_key_env,
++        max_tokens=10,
++    )
++    if not response_text:
++        return False
++
++    print(f"[API VLM Check] Raw response: '{response_text}'")
++    return response_text.lower().startswith("yes")
++
++
++def diagnose_stuck_with_api_vlm(
++    image_pair_queue: collections.deque,
++    current_subtask_instruction: str,
++    model_name: str,
++    base_url: str,
++    api_key_env: str,
++) -> bool:
++    prompt_text = (
++        f"Observe the image sequence for the robot executing: '{current_subtask_instruction}'. "
++        "Is the robot clearly stuck rather than still making useful progress? "
++        "Examples of stuck include a stationary arm, a failed grasp, repeated oscillation, collision with the table, "
++        "or no visible progress toward the subgoal across the sequence. Answer strictly with 'Stuck' or 'StillTrying'."
++    )
++    response_text = _call_api_vlm(
++        image_pair_queue=image_pair_queue,
++        prompt_text=prompt_text,
++        model_name=model_name,
++        base_url=base_url,
++        api_key_env=api_key_env,
++        max_tokens=12,
++    )
++    if not response_text:
++        return False
++
++    print(f"[API VLM Diagnose] Raw response: '{response_text}'")
++    return response_text.strip().lower().startswith("stuck")
+diff --git a/experiments/robot/libero/oracle_verifier.py b/experiments/robot/libero/oracle_verifier.py
+new file mode 100644
+index 0000000..77fe621
+--- /dev/null
++++ b/experiments/robot/libero/oracle_verifier.py
+@@ -0,0 +1,190 @@
++import re
++
++import numpy as np
++
++
++def _slug(text: str) -> str:
++    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
++
++
++def _strip_articles(text: str) -> str:
++    return re.sub(r"\b(the|a|an)\b", " ", text.lower()).strip()
++
++
++def _base_env(env):
++    return getattr(env, "env", env)
++
++
++def _find_state_name(env, phrase: str, *, prefer_region: str | None = None) -> str | None:
++    clean_phrase = _strip_articles(phrase)
++    phrase_slug = _slug(clean_phrase)
++    aliases = {
++        "stove": "flat_stove",
++        "pot": "moka_pot",
++    }
++    phrase_slug = aliases.get(phrase_slug, phrase_slug)
++
++    base_env = _base_env(env)
++    candidates = list(getattr(base_env, "object_states_dict", {}).keys())
++    if "drawer" in clean_phrase:
++        for drawer_level in ("bottom", "middle", "top"):
++            if drawer_level not in clean_phrase:
++                continue
++            drawer_matches = [
++                name for name in candidates
++                if "cabinet" in name and f"{drawer_level}_region" in name
++            ]
++            if drawer_matches:
++                return sorted(drawer_matches, key=len)[0]
++    if "caddy" in clean_phrase and ("compartment" in clean_phrase or "contain" in clean_phrase):
++        for compartment in ("back", "front", "left", "right"):
++            if compartment not in clean_phrase:
++                continue
++            caddy_matches = [
++                name for name in candidates
++                if "caddy" in name and f"{compartment}_contain_region" in name
++            ]
++            if caddy_matches:
++                return sorted(caddy_matches, key=len)[0]
++
++    if prefer_region:
++        region_matches = [
++            name for name in candidates
++            if phrase_slug in name and prefer_region in name
++        ]
++        if region_matches:
++            return sorted(region_matches, key=len)[0]
++
++    exact_matches = [
++        name for name in candidates
++        if name == phrase_slug or name.startswith(f"{phrase_slug}_")
++    ]
++    non_region_matches = [name for name in exact_matches if "region" not in name]
++    if non_region_matches:
++        return sorted(non_region_matches, key=len)[0]
++    if exact_matches:
++        return sorted(exact_matches, key=len)[0]
++
++    substring_matches = [name for name in candidates if phrase_slug in name]
++    if prefer_region:
++        substring_matches = [name for name in substring_matches if prefer_region in name]
++    if substring_matches:
++        return sorted(substring_matches, key=len)[0]
++    return None
++
++
++def _split_place_instruction(instruction: str) -> tuple[str, str, str] | None:
++    instruction_lower = _strip_articles(instruction)
++    for verb in ("place", "put"):
++        if not instruction_lower.startswith(verb):
++            continue
++        rest = instruction_lower.split(verb, 1)[1].strip()
++        for sep in (" into ", " onto ", " in ", " on "):
++            if sep in rest:
++                obj, target = rest.split(sep, 1)
++                return obj.strip(), sep.strip(), target.strip()
++    return None
++
++
++def _split_pick_and_place_instruction(instruction: str) -> tuple[str, str, str] | None:
++    instruction_lower = _strip_articles(instruction)
++    if not instruction_lower.startswith("pick up"):
++        return None
++
++    rest = instruction_lower.split("pick up", 1)[1].strip()
++    for connector in (" and place ", " and put "):
++        if connector not in rest:
++            continue
++        picked_obj, place_tail = rest.split(connector, 1)
++        picked_obj = picked_obj.strip()
++        place_tail = place_tail.strip()
++        for sep in (" into ", " onto ", " in ", " on "):
++            relation = sep.strip()
++            if place_tail.startswith(f"{relation} "):
++                return picked_obj, relation, place_tail[len(relation):].strip()
++            if sep in place_tail:
++                placed_obj, target = place_tail.split(sep, 1)
++                placed_obj = placed_obj.strip()
++                if placed_obj in ("", "it") or placed_obj in picked_obj or picked_obj in placed_obj:
++                    return picked_obj, relation, target.strip()
++                return placed_obj, relation, target.strip()
++    return None
++
++
++def _eval_predicate(env, state: list[str]) -> bool:
++    base_env = _base_env(env)
++    try:
++        return bool(base_env._eval_predicate(state))
++    except Exception as exc:
++        print(f"[Oracle Verifier] Failed to evaluate predicate {state}: {exc}")
++        return False
++
++
++def _check_pick_up(env, obs, object_name: str) -> bool:
++    obj_state_name = _find_state_name(env, object_name)
++    base_env = _base_env(env)
++    if not obj_state_name or obj_state_name not in base_env.object_states_dict:
++        print(f"[Oracle Verifier] Could not resolve pick-up object: {object_name}")
++        return False
++    if obs is None or "robot0_eef_pos" not in obs:
++        return False
++
++    obj_pos = base_env.object_states_dict[obj_state_name].get_geom_state()["pos"]
++    eef_pos = np.array(obs["robot0_eef_pos"], dtype=np.float32)
++    xy_close = np.linalg.norm(obj_pos[:2] - eef_pos[:2]) < 0.12
++    z_close = abs(obj_pos[2] - eef_pos[2]) < 0.18
++    lifted = obj_pos[2] > 0.88
++    return bool(xy_close and z_close and lifted)
++
++
++def check_completion_with_libero_oracle(env, obs, current_subtask_instruction: str) -> bool:
++    instruction = _strip_articles(current_subtask_instruction)
++
++    if instruction.startswith("turn on"):
++        obj_name = instruction.split("turn on", 1)[1].strip()
++        state_name = _find_state_name(env, obj_name)
++        return _eval_predicate(env, ["turnon", state_name]) if state_name else False
++
++    if instruction.startswith("turn off"):
++        obj_name = instruction.split("turn off", 1)[1].strip()
++        state_name = _find_state_name(env, obj_name)
++        return _eval_predicate(env, ["turnoff", state_name]) if state_name else False
++
++    if instruction.startswith("open"):
++        obj_name = instruction.split("open", 1)[1].strip()
++        state_name = _find_state_name(env, obj_name)
++        return _eval_predicate(env, ["open", state_name]) if state_name else False
++
++    if instruction.startswith("close"):
++        obj_name = instruction.split("close", 1)[1].strip()
++        state_name = _find_state_name(env, obj_name)
++        return _eval_predicate(env, ["close", state_name]) if state_name else False
++
++    parsed_place = _split_pick_and_place_instruction(instruction) or _split_place_instruction(instruction)
++    if parsed_place:
++        obj_name, relation, target_name = parsed_place
++        predicate_name = "in" if relation in ("in", "into") else "on"
++        prefer_region = "contain_region" if predicate_name == "in" else None
++        if "basket" in target_name:
++            predicate_name = "in"
++            prefer_region = "contain_region"
++        if "stove" in target_name:
++            predicate_name = "on"
++            prefer_region = "cook_region"
++
++        obj_state_name = _find_state_name(env, obj_name)
++        target_state_name = _find_state_name(env, target_name, prefer_region=prefer_region)
++        if not obj_state_name or not target_state_name:
++            print(
++                "[Oracle Verifier] Could not resolve place predicate: "
++                f"object={obj_name}->{obj_state_name}, target={target_name}->{target_state_name}"
++            )
++            return False
++        return _eval_predicate(env, [predicate_name, obj_state_name, target_state_name])
++
++    if instruction.startswith("pick up"):
++        obj_name = instruction.split("pick up", 1)[1].strip()
++        return _check_pick_up(env, obs, obj_name)
++
++    print(f"[Oracle Verifier] Unsupported instruction: {current_subtask_instruction}")
++    return False

@@ -1,8 +1,10 @@
 # Search Notes
 
-日期：2026-06-30
+日期：2026-07-07
 
 模式：重新细致调研，仿照低功耗/持续学习/Agent 自进化调研的规格化输出。目标是补齐透明物体方向的代码、数据、GPU、流程、创新、评测位置和 A2 威胁判断。
+
+2026-07-07 追加模式：按“透明物体/透明表面单目深度估计、CVPR/ICCV/ECCV 顶会优先、代码和数据可完整复现、尽量弱实体机器人相关”重新筛选。该口径下，Depth4ToM、LayeredDepth、SeeGroup、Diffusion4RobustDepth、MODEST 是当前最有用的复现候选；SeeClear 已确认 ECCV 2026，但 SeeClear-396k 数据仍未发布，因此暂不进入“完整复现”首选。
 
 ## 查询关键词
 
@@ -20,6 +22,10 @@
 - `AISPO Affine-Invariant Shape Prior non-Lambertian robotics`
 - `NTIRE 2026 HR Depth from Images of Specular and Transparent Surfaces`
 - `DepthShield transparent mirror surfaces depth estimation code`
+- `transparent object monocular depth estimation open source dataset CVPR ICCV ECCV`
+- `Depth4ToM ICCV 2023 code dataset transparent mirror monocular depth`
+- `LayeredDepth ICCV 2025 multi-layer depth transparent dataset github`
+- `SeeClear ECCV 2026 dataset model GitHub`
 
 代码/仓库核验查询：
 
@@ -32,6 +38,7 @@
 - GitHub API / README: `jun7-shi/ASGrasp`
 - GitHub API / README: `D-Robotics-AI-Lab/MODEST`
 - GitHub API / README: `princeton-vl/LayeredDepth`
+- GitHub API / README: `fabiotosi92/Diffusion4RobustDepth`
 - GitHub API / README: `GreatenAnoymous/MOMA`
 - GitHub API / README: `ChengYaofeng/ReMake`
 - GitHub API / README: `YumengHe/SeeClear`
@@ -58,12 +65,13 @@
 - ClearPose 官方 repo 是 `opipari/ClearPose`，公开 RGB、raw depth、true depth、normal、6D pose 和多 adversarial split。
 - DREDS 官方 repo 是 `PKU-EPIC/DREDS`，提供 DREDS simulated、STD real、DepthSensorSimulator、SwinDRNet 和 CatePoseEstimation。
 - Depth4ToM 官方 repo 是 `CVLAB-Unibo/Depth4ToM-code`，公开 virtual depth 数据、monocular weights 和部分代码；README 明确 stereo training code 不完全释放。
+- Diffusion4RobustDepth 官方 repo 是 `fabiotosi92/Diffusion4RobustDepth`，项目页和 README 提供 ECCV 2024 论文、代码、Hugging Face generated dataset 和模型权重入口；它不是透明物体专门方法，但适合作非朗伯/透明失败样本的通用单目深度 baseline。
 - ASGrasp 官方 repo 是 `jun7-shi/ASGrasp`，公开 checkpoint 和 inference 脚本，依赖 active stereo/MVS/GSNet。
 - MODEST repo 提供 Syn-TODD/ClearPose 数据入口、weights、training/eval/inference；README 明确 RTX 4090 测试环境。
 - LayeredDepth repo 提供 Hugging Face benchmark、evaluate/upload scripts 和 synthetic generator；synthetic 生成需要定制 Blender/Infinigen。
 - MOMA repo 存在，README 说明 one-shot metric depth alignment、UR5 grasping/suction、透明物体；README 较短，可运行性仍需后续实际拉代码核验。
 - ReMake 官方 project page 链到 `ChengYaofeng/ReMake`；README 提供 env、checkpoint、ClearGrasp/TransCG/OOD 数据入口、train/test/inference/realworld_inference 脚本。
-- SeeClear 官方 repo 是 `YumengHe/SeeClear`；当前是 code-only release，README 标注 model weights 和 dataset links coming soon。
+- SeeClear 官方 repo 是 `YumengHe/SeeClear`；2026-07-07 核验为 ECCV 2026，demo checkpoints 可用，但 SeeClear-396k dataset links 仍是 coming soon。
 - SeeGroup 官方 repo 是 `princeton-vl/SeeGroup`；README 提供 released checkpoint、validation/test/training 脚本。
 - DepthShield repo 是 `SeracoZ/DepthShield`；当前只作为 demo-level 观察项，venue/论文状态未核验。
 
@@ -73,7 +81,7 @@
 - TransCG: RTX 3090 测试环境。
 - MODEST: RTX 4090 测试环境。
 - ReMake: 1x RTX 3090 约 80 小时，或 8x RTX 3090 DDP 约 10 小时。
-- SeeClear: 论文页报告 4x H100 NVL 约 30 小时；README 当前不含权重/数据。
+- SeeClear: 论文页报告 4x H100 NVL 约 30 小时；README 当前可跑 demo/inference，但完整训练复现仍缺 SeeClear-396k 数据。
 - AISPO: 论文页报告 8x A100 训练、RTX 3090 评测；代码未找到。
 - MOMA: 论文页报告 RTX 3090 实时推理；训练成本未公开。
 - ClearGrasp、ClearPose、DREDS、Depth4ToM、ASGrasp、LayeredDepth、SeeGroup 的 GPU 型号或训练时间若 README 未明确，本报告写“未公开”或“型号/时间未公开”。
@@ -96,7 +104,7 @@
 
 - MOMA 仓库 README 较短，是否包含完整训练/评测脚本需要后续实际 clone 后核验。
 - AISPO 是否会公开代码、数据和 checkpoint，需持续监控。
-- SeeClear 权重和 SeeClear-396k 数据尚未在 README 中发布，当前不能作为可复现实验对象。
+- SeeClear demo checkpoint 已发布，但 SeeClear-396k 数据尚未在 README 中发布；当前不能作为完整训练可复现对象。
 - SeeGroup 已公开 checkpoint 和脚本，但训练 GPU 型号/时间未公开。
 - ClearDepth、Robust Non-Lambertian MDE、Transparent Object Depth Completion 的代码状态仍待补查。
 - 本仓库当前没有透明物体实验 CSV 或机器人日志，因此所有 A2 transparent slice、grasp proxy、real robot 结论均为 `待跑`。
@@ -119,7 +127,7 @@
 
 ### 监控
 
-- SeeClear weights/dataset release。
+- SeeClear-396k dataset release。
 - AISPO code/checkpoint release。
 - NTIRE 2026 final challenge report/leaderboard/code release。
 - MOMA 仓库是否补充完整复现实验脚本。

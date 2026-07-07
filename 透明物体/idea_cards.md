@@ -4,6 +4,8 @@ Date: 2026-06-29
 
 Update: 2026-06-30 重新细化调研后，ReMake 官方代码、checkpoint、训练脚本和 3090 训练成本已核验；SeeClear 为 code-only release，权重和数据待发布；AISPO 仍未找到公开代码。
 
+Update: 2026-07-07 按 CCF-A idea optimizer / reviewer 口径重筛，只保留能以完整复现工作为切入点的透明/镜面单目深度方向；主入口改为 Depth4ToM、LayeredDepth、SeeGroup、Diffusion4RobustDepth 和 MODEST。
+
 Mode: standard idea optimization after literature search.
 
 Venue lens: 默认按 CCF-A CVPR/ICCV/AI/CV 口径打磨问题、机制和证据；机器人抓取实验作为应用证据。若主投稿机器人方向，可转 ICRA/CoRL/RSS/RAL，但不把这些直接称为 CCF-A。
@@ -11,6 +13,137 @@ Venue lens: 默认按 CCF-A CVPR/ICCV/AI/CV 口径打磨问题、机制和证据
 Raw seed: “瞄准具体机器人应用场景来思考 MDE，比如透明物体抓取，一般需要矫正 depth。”
 
 Known closest-work risks: ClearGrasp, LIDF, TransCG, DREDS, MOMA, ReMake, SeeClear, AISPO, LayeredDepth, SeeGroup.
+
+## 2026-07-07 CCF-A Reproducible Idea Shortlist
+
+本节只讨论以完整复现工作为入口的 CCF-A 视觉会议路线。硬约束是: 顶会或强顶会生态、公开代码、公开数据或 benchmark、公开权重或可复现实验脚本；机器人强相关工作只作为辅助 baseline，不作为主叙事。
+
+### Closest-work subtraction
+
+| 起点工作 | 已覆盖内容 | 还可切的空位 |
+|---|---|---|
+| Depth4ToM | ICCV 2023；透明/镜面 ToM 单目/双目 depth；代码、数据、权重和复现实验脚本齐全 | 单层 depth 监督语义仍混合；缺少多层/可信度/失败类型解释 |
+| LayeredDepth | ICCV 2025；单图 multi-layer transparent depth benchmark、HF 数据和评测脚本公开 | 是 benchmark 和协议强项，传统单层 MDE 迁移与蒸馏仍可做 |
+| SeeGroup | CVPR 2026 Oral；LayeredDepth 上的 multi-layer transparent surface depth SOTA，checkpoint 和训练脚本公开 | 任务不是传统单层 MDE；可作为多层 teacher 或 protocol boundary |
+| Diffusion4RobustDepth | ECCV 2024；困难条件/非朗伯 MDE，代码、HF 数据和权重公开 | 不是透明物体专门方法；可作为通用 robust MDE baseline |
+| MODEST | ICRA 2025；单 RGB 透明分割+深度，代码、权重和数据入口公开 | 技术相关但机器人动机强；适合作辅助 baseline，不宜做主入口 |
+
+### 最推荐 ideas
+
+| 排名 | Idea | 起点资产 | 核心增量 | CCF-A 评分 | 严格判断 |
+|---|---|---|---|---:|---|
+| 1 | Layer-Aware ToM Depth | Depth4ToM + LayeredDepth + SeeGroup | 从单一透明 depth 回归改为 first-surface / transmitted-background / confidence 多假设输出，再蒸馏回常规 MDE | 4.10/5 | 最值得主攻；必须证明不是简单拼接 |
+| 2 | Transparent Depth Reliability | Depth4ToM + Diffusion4RobustDepth + LayeredDepth | 在 depth 外预测透明区域可信度、失败类型和 abstention map | 3.92/5 | 快速可落地；要避免变成普通 uncertainty paper |
+| 3 | Dual-Target Transparent MDE | LayeredDepth + Depth4ToM | 明确定义 `D_surface` 与 `D_visible/transmitted`，解决透明 depth 标签多义性 | 4.08/5 | 概念强；实验设计和任务用途必须很硬 |
+| 4 | Boundary-First Transparent Depth Refinement | Depth4ToM + MODEST | 用透明边界、mask、局部几何一致性修复边界 depth | 3.60/5 | 可作为附属模块；单独投稿增量偏小 |
+| 5 | Reproducible ToM Stress Benchmark + Specialist Router | 五个可复现工作 | 复现后构建 failure taxonomy，并按失败类型路由到专门方法 | 3.28/5 | 工程/benchmark 风险高；适合作实验支撑 |
+
+### Idea 1: Layer-Aware ToM Depth
+
+Task: 单图透明/镜面物体深度估计，从单一 depth 输出升级为 layer-aware depth hypotheses。
+
+Gap: Depth4ToM 已经给出透明/镜面区域的 strong single-depth baseline，但透明物体在一条视线上可能同时存在前表面、后表面、透射背景和虚拟深度。LayeredDepth/SeeGroup 证明多层协议更合理，但它们与传统单目 depth benchmark 的接口还不够直接。
+
+Core insight: 不把 transparent depth 当作一个标量回归目标，而是先预测多种物理语义不同的 depth，再根据任务蒸馏出传统单层 depth 或 contact/front-surface depth。
+
+Proposed mechanism:
+
+- Backbone: 先复现 Depth4ToM monocular 权重，作为 ToM single-depth teacher/baseline。
+- Layer teacher: 用 LayeredDepth/SeeGroup 的 multi-layer 输出定义 first-layer、background/transmitted layer 和 confidence。
+- Head: 增加 layer-aware head，输出 `D_front`、`D_transmitted`、`D_single` 和 `C_layer`。
+- Distillation: 在常规 MDE 协议下把多层输出蒸馏为单层预测，避免只能在 LayeredDepth 数据上工作。
+- Evaluation: Depth4ToM/Booster 做 ToM single-depth 主表，LayeredDepth 做 multi-layer 边界表，透明 mask 内和边界区域单独报告。
+
+Evidence package:
+
+- 必须先复现 Depth4ToM 官方 table 或公开脚本结果。
+- 必须跑 LayeredDepth validation eval 与 SeeGroup checkpoint。
+- Ablation: single-depth label vs layer-aware label vs layer-aware distillation。
+- Failure cases: 强折射、薄玻璃、背景纹理穿透、镜面高光、透明边界。
+
+Reviewer risks:
+
+- `covered-by-combination`: 如果只是把 Depth4ToM 和 SeeGroup 串起来，会被认为缺少核心机制。
+- `definition-risk`: 必须清楚写出不同 depth target 的物理语义，不能含混地叫 transparent depth。
+- `data-risk`: LayeredDepth synthetic 和 Depth4ToM/Booster 协议不同，跨协议实验要公平。
+
+Current recommendation: 第一优先。论文主张应写成“透明/镜面 MDE 的监督语义重定义与 layer-aware 可复现实证”，而不是“又一个透明深度网络”。
+
+### Idea 2: Transparent Depth Reliability
+
+Task: 让透明/镜面 MDE 输出 depth 的同时，输出可信度、失败类型和 selective prediction。
+
+Gap: 现有方法通常只比较 depth 误差；但透明区域常出现高置信错误，机器人或后续 3D 系统更需要知道哪里不可信。
+
+Core insight: 可复现 baseline 的残差本身可以构造 failure supervision。透明 mask 内的大误差区域、边界误差、背景透射误差、尺度误差可以被自动转成可靠性标签。
+
+Proposed mechanism:
+
+- 复现 Depth4ToM 与 Diffusion4RobustDepth，得到透明/非朗伯错误图。
+- 用 LayeredDepth/SeeGroup 判断多层歧义区域，作为 failure type 的语义来源。
+- 输出 depth、uncertainty、failure type 和 abstention mask。
+- 评估 risk-coverage、failure detection AUROC、transparent-mask ECE，以及 selective depth error。
+
+Evidence package:
+
+- 与普通 uncertainty baseline 比较，而不是只报可视化。
+- 在 Booster/LayeredDepth/Depth4ToM 数据上跨域测试。
+- 验证 reliability map 能帮助 pseudo-label filtering 或 layer-aware distillation。
+
+Reviewer risks:
+
+- `generic-uncertainty`: 必须绑定透明/镜面物理失败类型，否则像普通 calibration 工作。
+- `weak-method`: 如果没有利用多层或 ToM 语义，只是多一个 head，增量不足。
+
+Current recommendation: 第二优先。适合和 Idea 1 合并成辅助贡献，也可以先做快速实验验证透明 failure slice 是否稳定。
+
+### Idea 3: Dual-Target Transparent MDE
+
+Task: 把透明物体单目深度定义为双目标预测: `D_surface` 和 `D_visible/transmitted`。
+
+Gap: 透明物体的 RGB 外观可能来自背景层，但机器人或几何系统需要的是前表面/接触面。单一 depth label 会把这两种目标混在一起。
+
+Core insight: 把“视觉可见纹理对应深度”和“透明物体物理表面深度”分开建模，避免模型学到不稳定平均解。
+
+Proposed mechanism:
+
+- `D_surface`: 透明物体前表面或 contact/front surface depth。
+- `D_visible`: 图像中可见纹理或透射背景对应 depth。
+- `alpha/confidence`: 解释当前像素更接近哪一种 depth target。
+- 数据来源: LayeredDepth multi-layer GT、Depth4ToM virtual depth、Booster ToM masks。
+
+Evidence package:
+
+- 展示单一标签在透明 mask 内的多义性统计。
+- 比较 single-target、dual-target、dual-target-to-single distillation。
+- 做跨数据集泛化，证明 dual-target 不只是拟合 LayeredDepth。
+
+Reviewer risks:
+
+- `utility-risk`: 必须证明 dual target 对 MDE、depth completion 或机器人 proxy 有用。
+- `label-risk`: `D_surface` 与 `D_visible` 的 GT 构造要严谨，不能靠手工解释。
+
+Current recommendation: 概念潜力高，但第一轮不宜单独主攻；可作为 Idea 1 的理论解释和任务定义章节。
+
+### Secondary ideas
+
+Boundary-First Transparent Depth Refinement 可以作为 Idea 1 的边界分支或 ablation，不建议独立投稿。Reproducible ToM Stress Benchmark + Specialist Router 更适合做复现实验平台和 failure taxonomy，用来支撑主线论文，而不是单独作为 CVPR/ICCV 方法主张。
+
+### 最小落地顺序
+
+| 周期 | 动作 | 产物 |
+|---|---|---|
+| W1 | 复现 Depth4ToM monocular 权重和官方 eval；跑 LayeredDepth validation eval；跑 SeeGroup checkpoint | 三个可引用 baseline 数字和环境记录 |
+| W2 | 构建统一 ToM eval wrapper，统一 transparent mask、boundary、full image、layer metrics | 可复现 leaderboard 草表 |
+| W3 | 实现 layer-aware head 或后处理原型，先不大改 backbone | Idea 1 最小结果 |
+| W4 | 加入 reliability/failure type head，做 selective prediction 与 failure AUROC | Idea 2 辅助结果 |
+| W5 | 写 ablation: single-depth、layer-aware、dual-target、distillation | 投稿主表雏形 |
+
+Go / no-go gate:
+
+- 如果 Idea 1 不能在 transparent mask 内超过 Depth4ToM，停止主攻，转做 reliability benchmark。
+- 如果只在 LayeredDepth 上好、在 Booster/Depth4ToM 协议上不泛化，主张收窄为 multi-layer transparent depth，不要声称通用 MDE。
+- 如果 reliability map 能稳定定位 Depth4ToM/SeeGroup 失败区域，即使 depth 主指标提升小，也可保留为诊断贡献。
 
 ## Raw Idea Diagnosis
 

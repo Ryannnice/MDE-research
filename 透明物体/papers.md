@@ -1,6 +1,6 @@
 # 机器人透明物体 MDE 与 Depth Correction 细致调研
 
-日期：2026-06-30
+日期：2026-07-07
 
 本报告重新调研“机器人透明/反光物体抓取中的单目深度估计、RGB-D depth completion、metric alignment、多层透明深度和非朗伯评测”。目标是给 A2 判断应用切口、baseline、数据集和 reviewer threat，而不是证明 A2 已经在该场景有效。所有 A2 相关数字仍为 `待跑`。
 
@@ -9,6 +9,20 @@
 ## 一句话结论
 
 透明物体抓取中的 depth correction 已经是拥挤方向。ClearGrasp、LIDF、TransCG、DREDS 把 RGB-D 透明深度恢复和抓取基线做成了成熟主线；Depth4ToM、MODEST、MOMA、ReMake、SeeClear、AISPO 又把 MDE、mask、one-shot metric alignment、生成式 opacification 和 affine-invariant shape prior 接入透明/非朗伯深度。A2 若切入这个场景，不能说“用 MDE 修透明物体”是新贡献，必须收窄到“冻结深度先验 + 采样期 metric anchoring + 同源 post-hoc 对照 + 透明/反光 failure slice + `nfe_real` 成本纪律”。
+
+## 2026-07-07 严格单目筛选更新
+
+若不按 A2/机器人抓取优先级，而按“透明物体/透明表面单目深度估计、CVPR/ICCV/ECCV 顶会、代码和数据可完整复现、尽量弱实体机器人相关”筛选，推荐顺序如下:
+
+| 优先级 | 工作 | 结论 |
+|---|---|---|
+| 1 | [Depth4ToM](https://github.com/CVLAB-Unibo/Depth4ToM-code) | ICCV 2023，代码/数据/权重公开，最符合严格条件，首选复现 |
+| 2 | [LayeredDepth](https://github.com/princeton-vl/LayeredDepth) | ICCV 2025，benchmark、HF 数据、评测脚本和 synthetic generator 公开；任务是 multi-layer depth |
+| 3 | [SeeGroup](https://github.com/princeton-vl/SeeGroup) | CVPR 2026 Oral，代码和 checkpoint 公开；LayeredDepth 上的 multi-layer depth SOTA |
+| 4 | [Diffusion4RobustDepth](https://github.com/fabiotosi92/Diffusion4RobustDepth) | ECCV 2024，代码、生成数据和模型权重公开；不是透明专门方法，但适合做非朗伯 MDE baseline |
+| 5 | [MODEST](https://github.com/D-Robotics-AI-Lab/MODEST) | 单 RGB 透明分割+深度可复现，但 ICRA 2025 且机器人动机较强，排在视觉顶会方法之后 |
+
+[SeeClear](https://github.com/YumengHe/SeeClear) 已确认 ECCV 2026，方法高度相关，但截至 2026-07-07 只有 demo checkpoints 可用，SeeClear-396k 数据仍未发布，因此暂不满足“代码+数据完整复现”的硬条件。RGB-D completion 和抓取系统工作，如 ClearGrasp、LIDF、TransCG、TODE-Trans、ReMake，应作为相关基线或机器人上界，不放入严格单目首选。
 
 ## 主候选表
 
@@ -28,7 +42,7 @@ CCF-A 状态说明：本表只把 CVPR/ICCV 标为“CCF-A 视角确认”。ECC
 | 10 | [LayeredDepth](https://arxiv.org/abs/2503.11633) | 2025 ICCV / arXiv | ICCV 视角强相关 | [code/data](https://github.com/princeton-vl/LayeredDepth), [HF data](https://huggingface.co/datasets/princeton-vl/LayeredDepth) | 中；real relative benchmark + synthetic generator，生成需定制 Blender/Infinigen | GPU 未公开 | multi-layer transparent depth dataset/protocol | 概念边界；A2 单层 depth 必须限定 contact/grasp-relevant surface |
 | 11 | [MOMA](https://arxiv.org/abs/2506.17110) | 2025 arXiv | 未录用/待核验 | [code](https://github.com/GreatenAnoymous/MOMA) | 中；UR5、稀疏 GT depth 校准、透明物体抓取 | 论文页报告 RTX 3090 实时推理，训练成本未公开 | one-shot sparse metric alignment for RGB grasping | 最危险近邻；必须做 MOMA-style post-hoc/SRS 对照 |
 | 12 | [ReMake](https://arxiv.org/abs/2508.02507) | 2026 RA-L | 机器人 journal | [code/checkpoint](https://github.com/ChengYaofeng/ReMake) | 高；ClearGrasp、TransCG、OOD 数据入口 | README: 1x3090 80h 或 8x3090 10h | instance mask + MDE + RGB-D depth completion | 透明抓取直接威胁；强跟进 baseline |
-| 13 | [SeeClear](https://arxiv.org/abs/2603.19547) | 2026 arXiv | 未录用/待核验 | [code-only release](https://github.com/YumengHe/SeeClear) | 中；SeeClear-396k 论文数据，README 标注 weights/data coming soon | 论文报告 4x H100 NVL 约 30h；README 仅代码 | generative opacification + off-the-shelf MDE | 生成式预处理强威胁；复现需等权重/数据 |
+| 13 | [SeeClear](https://arxiv.org/abs/2603.19547) | 2026 ECCV | ECCV 顶会；完整复现待数据 | [code + demo checkpoints](https://github.com/YumengHe/SeeClear) | 中；SeeClear-396k 论文数据仍未发布 | 论文报告 4x H100 NVL 约 30h | generative opacification + off-the-shelf MDE | 生成式预处理强威胁；训练复现需等数据 |
 | 14 | [SeeGroup](https://arxiv.org/abs/2605.28735) | 2026 CVPR Oral | CCF-A 确认 | [code/checkpoint](https://github.com/princeton-vl/SeeGroup) | 中；LayeredDepth validation/test | README 支持 single/multi GPU，型号/时间未公开 | unordered point-process multi-layer depth | 多层透明深度强威胁；限定 A2 claim 边界 |
 | 15 | [AISPO](https://arxiv.org/abs/2606.25503) | 2026 RA-L forthcoming / arXiv | 机器人 journal | 代码未找到 | 中；非朗伯机器人 manipulation 评测 | 论文页报告 8x A100 训练、RTX 3090 评测 | affine-invariant shape prior for depth reliability | 与 A2 affine prior/metric correction 相邻；强观察，代码公开后跟进 |
 
@@ -84,7 +98,7 @@ CCF-A 状态说明：本表只把 CVPR/ICCV 标为“CCF-A 视角确认”。ECC
 
 ### 13. SeeClear
 
-《SeeClear: Reliable Transparent Object Depth Estimation via Generative Opacification》（2026，arXiv，代码：有但 code-only）主要解决透明外观不稳定导致 MDE 错误的问题。它引入 SeeClear-396k synthetic paired transparent/opaque dataset，但 README 标明 pretrained checkpoints 和 dataset links coming soon，我们收集难度为中偏低，原因是当前可跑性受权重/数据发布限制。GPU/硬件信息为论文页报告 4x H100 NVL 约 30 小时训练。工作流程是 transparent mask preparation、conditional diffusion opacification、mask refinement、opaque compositing，再接 Depth Anything 3 或 MoGe。实际创新是把透明区域先生成成几何一致的不透明外观，再用 off-the-shelf MDE。评测位置包括透明 depth estimation 数据与 off-the-shelf MDE 对照。对 A2 的影响是：SeeClear 会压住“预处理透明外观再跑 MDE”的路线；A2 若使用生成或多候选 opacification，必须明确自己是在做 uncertainty/metric anchoring，而不是复刻 SeeClear。综合判断：强观察，等权重/数据。
+《SeeClear: Reliable Transparent Object Depth Estimation via Generative Opacification》（2026，ECCV，代码：有，demo checkpoints 已公开）主要解决透明外观不稳定导致 MDE 错误的问题。它引入 SeeClear-396k synthetic paired transparent/opaque dataset，但截至 2026-07-07 数据链接仍未发布，我们收集难度为中，原因是 demo/inference 可跑但完整训练复现仍受数据发布限制。GPU/硬件信息为论文页报告 4x H100 NVL 约 30 小时训练。工作流程是 transparent mask preparation、conditional diffusion opacification、mask refinement、opaque compositing，再接 Depth Anything 3 或 MoGe。实际创新是把透明区域先生成成几何一致的不透明外观，再用 off-the-shelf MDE。评测位置包括透明 depth estimation 数据与 off-the-shelf MDE 对照。对 A2 的影响是：SeeClear 会压住“预处理透明外观再跑 MDE”的路线；A2 若使用生成或多候选 opacification，必须明确自己是在做 uncertainty/metric anchoring，而不是复刻 SeeClear。综合判断：强观察，等 SeeClear-396k 数据。
 
 ### 14. SeeGroup
 

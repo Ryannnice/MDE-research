@@ -1,6 +1,6 @@
 # 机器人透明物体 MDE 与 Depth Correction 调研总结
 
-日期：2026-06-30
+日期：2026-07-07
 
 本总结基于同目录 `literature-spec.md`、`papers.md`、`papers.csv` 和 `search-notes.md`。目标不是写透明物体综述，而是判断透明/反光物体抓取是否适合成为 A2 的应用 failure slice，以及哪些近作会压住 A2 的 novelty。
 
@@ -8,13 +8,41 @@
 
 透明物体抓取中的 depth correction 不是空白方向。ClearGrasp、LIDF、TransCG、DREDS 已经把 RGB-D 透明深度恢复和抓取 baseline 做成熟；Depth4ToM、MODEST、MOMA、ReMake、SeeClear、AISPO 又把 MDE、mask、one-shot metric alignment、生成式 opacification 和 affine-invariant shape prior 接进透明/非朗伯场景。A2 如果要用这个场景，最安全的定位不是“做透明物体深度估计”，而是把透明/反光物体作为验证 sampling-time metric anchoring 的高压 failure slice。
 
+## 严格单目透明深度筛选
+
+如果按“单目 RGB 或单图输入、透明物体/透明表面深度估计、CVPR/ICCV/ECCV 顶会优先、代码和数据能支撑完整复现、尽量弱机器人相关”重新筛选，优先级应改为:
+
+| 优先级 | 工作 | 推荐理由 | 注意事项 |
+|---|---|---|---|
+| 1 | [Depth4ToM](https://github.com/CVLAB-Unibo/Depth4ToM-code) | ICCV 2023；代码、数据、权重齐全；透明/镜面 ToM 单目深度最贴合 | 首选复现 |
+| 2 | [LayeredDepth](https://github.com/princeton-vl/LayeredDepth) | ICCV 2025；代码、HF benchmark、评测脚本和 synthetic generator 公开 | 多层深度协议，不是传统单层 depth |
+| 3 | [SeeGroup](https://github.com/princeton-vl/SeeGroup) | CVPR 2026 Oral；LayeredDepth 上的多层透明深度方法，代码和 checkpoint 公开 | 与 LayeredDepth 配套复现 |
+| 4 | [Diffusion4RobustDepth](https://github.com/fabiotosi92/Diffusion4RobustDepth) | ECCV 2024；代码、生成数据和模型权重公开，可作非朗伯/透明失败样本 baseline | 不是透明物体专门方法 |
+| 5 | [MODEST](https://github.com/D-Robotics-AI-Lab/MODEST) | 单张 RGB 透明分割+深度，代码、权重、Syn-TODD/ClearPose 入口齐全 | ICRA 2025，机器人动机较强，故低于视觉顶会工作 |
+
+暂缓: [SeeClear](https://github.com/YumengHe/SeeClear) 已确认 ECCV 2026 且方法高度相关，但截至 2026-07-07 SeeClear-396k 数据仍未发布，只能跑 demo/inference，暂不满足“代码+数据完整复现”的硬条件。ClearGrasp/LIDF/TODE/TransCG/ReMake 等主要是 RGB-D completion 或抓取系统，不放入严格单目首选清单。
+
+## CCF-A idea shortlist: 以可复现工作为切入点
+
+按 CCF-A 视觉会议口径，当前最值得推进的不是泛泛地做“透明物体深度估计”，而是从 Depth4ToM、LayeredDepth、SeeGroup、Diffusion4RobustDepth 和 MODEST 这些可复现工作中做减法，找到透明/镜面 MDE 的监督语义、可靠性和协议边界问题。
+
+| 排名 | Idea | 起点工作 | 核心增量 | 当前判断 |
+|---|---|---|---|---|
+| 1 | Layer-Aware ToM Depth | Depth4ToM + LayeredDepth + SeeGroup | 从单一 depth 回归改为 front surface、transmitted/background、single depth 和 confidence 多假设输出，再蒸馏回常规 MDE | 第一优先，最像 CCF-A 视觉主线 |
+| 2 | Transparent Depth Reliability | Depth4ToM + Diffusion4RobustDepth + LayeredDepth | 预测透明区域可信度、失败类型和 abstention map | 第二优先，可作为主线辅助贡献 |
+| 3 | Dual-Target Transparent MDE | LayeredDepth + Depth4ToM | 区分 `D_surface` 与 `D_visible/transmitted`，解决透明 depth 标签多义性 | 概念强，但实验设计要很严 |
+| 4 | Boundary-First Transparent Depth Refinement | Depth4ToM + MODEST | 用透明边界、mask 和局部几何一致性修复边界 depth | 适合作模块，独立增量偏小 |
+| 5 | Reproducible ToM Stress Benchmark + Specialist Router | 五个可复现工作 | 构建 failure taxonomy，并按失败类型路由到专门方法 | 适合作实验平台，独立投稿风险较高 |
+
+主推方向是 Layer-Aware ToM Depth: 先完整复现 Depth4ToM，再跑 LayeredDepth validation eval 和 SeeGroup checkpoint；随后实现 layer-aware head，输出 `D_front`、`D_transmitted/background`、`D_single` 和 `C_layer`。必须做 single-depth vs layer-aware、with/without confidence、Depth4ToM-only vs multi-layer teacher、Booster/Depth4ToM/LayeredDepth cross-eval。若 transparent mask 内不能超过 Depth4ToM，应停止主攻，转做 reliability benchmark。
+
 ## 当前最值得优先读的论文
 
 | 优先级 | 论文/资源 | 为什么先读 | 跟进建议 |
 |---|---|---|---|
 | 1 | [MOMA](https://arxiv.org/abs/2506.17110) | 单 RGB + one-shot sparse metric alignment + UR5 grasping，和 A2 稀疏锚/metric grounding 最像 | 必读；必须做 MOMA-style post-hoc/SRS 对照 |
 | 2 | [ReMake](https://arxiv.org/abs/2508.02507) | 透明抓取 + MDE + instance mask + RGB-D completion，代码、checkpoint、训练成本明确 | 强跟进；作为透明抓取直接 baseline |
-| 3 | [SeeClear](https://arxiv.org/abs/2603.19547) | 生成式 opacification + off-the-shelf MDE，直接压住“透明预处理再跑 MDE”路线 | 强观察；等权重/数据，先读方法边界 |
+| 3 | [SeeClear](https://arxiv.org/abs/2603.19547) | 生成式 opacification + off-the-shelf MDE，直接压住“透明预处理再跑 MDE”路线 | 强观察；demo checkpoint 已有，完整训练复现仍等 SeeClear-396k 数据 |
 | 4 | [LayeredDepth](https://arxiv.org/abs/2503.11633) + [SeeGroup](https://arxiv.org/abs/2605.28735) | 多层透明深度会挑战“唯一真 depth”的假设 | 必读；A2 需限定 contact/front/grasp-relevant surface |
 | 5 | [MODEST](https://arxiv.org/abs/2502.14616) | 单 RGB 联合透明分割和深度，代码与 RTX 4090 环境公开 | 若 A2 用 mask/semantic 先验，必须对照或解释 |
 | 6 | [TransCG](https://arxiv.org/abs/2202.08471) | 57,715 张真实透明 RGB-D，含抓取 baseline，是透明 failure slice 首选数据 | 作为第一批离线数据源 |
@@ -82,4 +110,4 @@ A2 可以把透明/反光物体作为 application failure slice，但不适合�
 1. 先读 MOMA/ReMake/SeeClear，确认 A2 的 novelty 边界。
 2. 在 A2 failure slices 中规划 TransCG/Booster/ClearPose 的透明 mask 指标，全部标 `待跑`。
 3. 设计同源后处理对照：global affine、patch affine、MOMA-style SRS、mask-guided completion。
-4. 继续监控 AISPO 和 SeeClear 的代码/权重/数据发布状态。
+4. 继续监控 AISPO 的代码/权重/数据发布状态，以及 SeeClear-396k 数据发布状态。
