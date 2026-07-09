@@ -18,6 +18,8 @@ Known closest-work risks: ClearGrasp, LIDF, TransCG, DREDS, MOMA, ReMake, SeeCle
 
 本节只讨论以完整复现工作为入口的 CCF-A 视觉会议路线。硬约束是: 顶会或强顶会生态、公开代码、公开数据或 benchmark、公开权重或可复现实验脚本；机器人强相关工作只作为辅助 baseline，不作为主叙事。
 
+深入规划: [`layer_aware_tom_depth_plan.md`](./layer_aware_tom_depth_plan.md) 已将第一推荐方向 `Layer-Aware ToM Depth` 展开为问题定义、最近邻减法、方法版本、实验矩阵、风险和 8 周计划。
+
 ### Closest-work subtraction
 
 | 起点工作 | 已覆盖内容 | 还可切的空位 |

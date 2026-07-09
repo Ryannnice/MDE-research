@@ -109,6 +109,15 @@
 - ClearDepth、Robust Non-Lambertian MDE、Transparent Object Depth Completion 的代码状态仍待补查。
 - 本仓库当前没有透明物体实验 CSV 或机器人日志，因此所有 A2 transparent slice、grasp proxy、real robot 结论均为 `待跑`。
 
+## 2026-07-07 Layer-Aware ToM Depth 补充检索
+
+围绕 `Layer-Aware ToM Depth` 又补查了 `layer-aware transparent depth`、`multi-layer monocular depth front surface`、`dual-target transparent depth` 等关键词，新增两个需要写进 reviewer threat 的方向:
+
+- [DepthFocus](https://github.com/junhong-3dv/DepthFocus): CVPR 2026，controllable depth estimation for see-through scenes。概念上接近“按用户/任务意图选择哪一层 depth”，但截至 2026-07-07 GitHub 基本只有 README，写明 camera-ready 和 demo code 正在准备，暂不能作为完整复现入口。
+- [MDA](https://github.com/biansy000/MDA): 2026 arXiv，`Modeling Depth Ambiguity: A Mixture-Density Representation for Flying-Point-Free Depth Estimation`。官方仓库已公开训练、评测、demo 和 Hugging Face checkpoints；它用 mixture-density 表示多 depth hypotheses，并扩展到透明区域的 first/last layer。它不是已确认顶会工作，但对 `Layer-Aware ToM Depth` 的“多假设表示”构成直接威胁，后续方法必须把 novelty 写成透明/镜面 target semantics 与 single-depth/multi-layer bridge，而不是单纯 mixture head。
+
+对应深入规划见 [`layer_aware_tom_depth_plan.md`](./layer_aware_tom_depth_plan.md)。
+
 ## A2 Handoff Notes
 
 ### 写作

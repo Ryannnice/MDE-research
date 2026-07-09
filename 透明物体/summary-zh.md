@@ -26,6 +26,8 @@
 
 按 CCF-A 视觉会议口径，当前最值得推进的不是泛泛地做“透明物体深度估计”，而是从 Depth4ToM、LayeredDepth、SeeGroup、Diffusion4RobustDepth 和 MODEST 这些可复现工作中做减法，找到透明/镜面 MDE 的监督语义、可靠性和协议边界问题。
 
+第一推荐方向 `Layer-Aware ToM Depth` 的深入规划已单独写入 [`layer_aware_tom_depth_plan.md`](./layer_aware_tom_depth_plan.md)。补充检索显示，`DepthFocus` 和 `MDA` 是新增强威胁: 前者是 CVPR 2026 controllable see-through depth 但代码尚未真正释放；后者是 2026 arXiv，代码/权重公开，用 mixture-density 做多假设深度并扩展到透明层。
+
 | 排名 | Idea | 起点工作 | 核心增量 | 当前判断 |
 |---|---|---|---|---|
 | 1 | Layer-Aware ToM Depth | Depth4ToM + LayeredDepth + SeeGroup | 从单一 depth 回归改为 front surface、transmitted/background、single depth 和 confidence 多假设输出，再蒸馏回常规 MDE | 第一优先，最像 CCF-A 视觉主线 |
