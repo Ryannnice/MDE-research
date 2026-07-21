@@ -7,7 +7,7 @@
 | 类目 | 入口 | 内容 |
 |---|---|---|
 | MDE | [`MDE/目录.md`](MDE/目录.md) | 单目深度估计文献、选题和 PDF 归档 |
-| 透明物体 | [`透明物体/透明物体单目深度估计用于机器人.md`](透明物体/透明物体单目深度估计用于机器人.md) | 透明/非朗伯物体深度、机器人抓取相关调研、复现和外部代码 |
+| 透明物体 | [`透明物体/目录.md`](透明物体/目录.md) | 当前主线为多层透明薄壳几何抓取；含统一 idea、实验设计、文献与复现 |
 | Agentic Robot | [`Agentic Robot/目录.md`](<Agentic Robot/目录.md>) | 长程机器人操作中的 agentic VLA/VLM、记忆、验证、反思与恢复 |
 
 ## 目录结构
@@ -19,7 +19,10 @@ MDE/
   文献调研/
   papers/
 透明物体/
-  透明物体单目深度估计用于机器人.md
+  目录.md
+  Shell-Aware-Multi-Layer-Transparent-Grasping-Idea-v2.md
+  Shell-Aware-Multi-Layer-Transparent-Grasping-Experiment-v1.md
+  literature-search-20260719-shell-aware-transparent-grasping/
   复现/
   external/
   pdfs/

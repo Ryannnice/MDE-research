@@ -1,5 +1,7 @@
 # 机器人透明物体 MDE 与 Depth Correction 调研总结
 
+> **状态：2026-07-07 广义背景总结。** 其中“A2 / Layer-Aware ToM 第一优先”等排序已不再代表当前项目决策；现行入口见 [透明物体研究目录](目录.md)。
+
 日期：2026-07-07
 
 本总结基于同目录 `literature-spec.md`、`papers.md`、`papers.csv` 和 `search-notes.md`。目标不是写透明物体综述，而是判断透明/反光物体抓取是否适合成为 A2 的应用 failure slice，以及哪些近作会压住 A2 的 novelty。

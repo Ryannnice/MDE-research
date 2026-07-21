@@ -1,0 +1,13 @@
+name: layereddepth
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - numpy==1.26.4
+      - opencv-python==4.10.0.84
+      - Pillow==12.3.0
+      - datasets==5.0.0
+      - requests-toolbelt==1.0.0
+      - jsonlines==4.0.0

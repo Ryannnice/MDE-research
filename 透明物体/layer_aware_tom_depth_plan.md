@@ -1,5 +1,7 @@
 # Layer-Aware ToM Depth 深入调研与课题规划
 
+> **状态：支撑感知线。** 当前总项目主线为 [Shell-Aware Multi-Layer Transparent Grasping](Shell-Aware-Multi-Layer-Transparent-Grasping-Idea-v2.md)。本文继续负责 Depth4ToM / LayeredDepth / SeeGroup 的感知协议与复现资产，不再单独定义总项目 idea。
+
 日期: 2026-07-07
 
 目标: 把 `Layer-Aware ToM Depth` 从 idea 细化成一个可复现、可证伪、面向 CCF-A 视觉会议口径的研究计划。本文只写规划，不写已完成实验；所有未跑结论保持 `待跑`。

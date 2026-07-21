@@ -12,4 +12,8 @@ CLAUDE-FABLE-5.md
 data/
 weights/
 runs/
+teacher/
 analysis/
+
+# 按 commit 固定、但不纳入主仓库的上游复现代码
+/透明物体/external/

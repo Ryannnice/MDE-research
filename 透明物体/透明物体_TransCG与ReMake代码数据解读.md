@@ -1,5 +1,7 @@
 # TransCG 与 ReMake: 透明物体深度补全代码/数据解读
 
+> **状态：当前 G0 支撑资料。** 该 smoke test 可用于搭建 ReMake / TransCG failure diagnostic，但不能代替 [统一实验设计](Shell-Aware-Multi-Layer-Transparent-Grasping-Experiment-v1.md) 中的真实薄壳 GT 与机器人证据。
+
 日期: 2026-07-01
 
 本文只整理两个已开始复现的透明物体深度补全工作:

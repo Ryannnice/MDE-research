@@ -1,5 +1,7 @@
 # 透明物体深度方法骨架与代码 I/O 调研
 
+> **状态：工程背景与支撑资料。** 当前总项目主线及方法边界见 [统一 Idea v2](Shell-Aware-Multi-Layer-Transparent-Grasping-Idea-v2.md)；本文中的旧“第一选择 / 主线”表述按 2026-07-10 历史上下文理解。
+
 日期: 2026-07-10
 
 本文仿照 `Agent_Research/literature-search-20260707-conflict-aware-agent-memory/方法骨架与代码IO调研.md` 的写法，记录透明/镜面/非朗伯物体深度方向中最相关工作的 **方法骨架、benchmark / 代码 I/O、依赖框架、创新点、对我们课题的直接用途**。
@@ -1025,4 +1027,3 @@ TransCG / ClearPose / Booster
 3. 建一个统一 `runs/` 输出约定，所有 baseline 都保存 `predictions/metrics.json/config.yaml`。
 4. 先跑 gap diagnostics，不先训练新模型。
 5. 若 gap 成立，再实现 V1 ordered multi-head；若无 gap，转 reliability / protocol paper。
-
