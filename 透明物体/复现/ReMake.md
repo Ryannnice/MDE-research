@@ -24,6 +24,12 @@ ReMake 的完整题目是 *Rethinking Transparent Object Grasping: Depth Complet
 
 ## 当前状态
 
+### 2026-07-26 全量复现更新
+
+- 公共 GPU 环境已验证 ReMake checkpoint（epoch 39）与完整 Depth Anything V2 Small / VITS 权重的严格 state-dict 加载；权重保存为 `weights/depth-anything-v2/depth_anything_v2_vits.pth`，SHA-256 为 `715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378`。
+- 已实现使用官方 ReMake dataset、relative-depth backbone、trainer 和 metrics 的全 test cache runner，以及未改动 `main.py --mode test` 的 native cross-check wrapper。二者都要求完整 TransCG test 才会标为 official full。
+- 目前真实全量仍受 TransCG 官方 Google Drive 的全局 quota exceeded 阻塞；不得把此前 synthetic smoke 或任何单分块读数写入 baseline 表。
+
 已完成:
 
 - 官方代码已克隆到 `透明物体/external/remake/official/`，提交为 `4f568148c8421544136bf49bb941149e0c990a34`。

@@ -27,13 +27,14 @@ GT / mesh 薄壳可行性审计
 
 2026-07-19 状态：公开 Base 路线已完成全量复现；支撑线 `G1 strong PASS`。Depth4ToM FT 权重仍是明确的上游 artifact blocker，Base 结果不得改名为 FT 结果。总项目仍受 shell GT / grasp-failure 主 G0 约束。
 
-## 当前 shell G0 的已有 smoke 资产
+## 当前 shell G0 的 baseline 资产与状态
 
 - [`TransCG_DFNet.md`](TransCG_DFNet.md)
 - [`ReMake.md`](ReMake.md)
+- [`G0_执行总控.md`](G0_执行总控.md)：当前全量 baseline、shell GT 与 planner gate 的可执行总控
 
 注意：
 
-- TransCG 当前只有 synthetic smoke，真实数据与 mesh 薄壳字段尚未审计；
-- ReMake 当前只有 synthetic relative-depth smoke，尚未得到完整真实 baseline 结果；
+- TransCG / ReMake 的 released checkpoint、GPU environment、完整 test runner、原生 cross-check wrapper 与 per-frame cache 已就绪；但官方 Google Drive 当前对 TransCG 第 2–13 分块返回 quota exceeded，尚未得到完整真实 baseline 结果；
+- TablewareNet physical-shell batch oracle、T²SQNet released-model GT-mask runner 和 per-object evaluation 已实现并有端到端测试；正式数据/权重下载正在进行，GT-mask 与 RGB segmentation 必须分行报告；
 - 以上记录不能写成已证明 single-depth 会导致实心化，也不能写成机器人提升。

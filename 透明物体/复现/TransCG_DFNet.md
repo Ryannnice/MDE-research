@@ -22,6 +22,15 @@ TransCG 的问题设定是透明物体 RGB-D depth completion。输入不是单 
 
 ## 当前状态
 
+### 2026-07-26 全量复现更新
+
+- 新建并验证了 GPU 统一环境 `transparent-baselines-gpu`（PyTorch 2.8.0+cu128、RTX 5880 Ada）。
+- 已实现 `audit_transcg.py`、全 test 的 DFNet cache runner 和不改上游 `test.py` 的 native cross-check wrapper；只有 23,524 个 test sample 全部存在时才允许写 `official_full_test`。
+- `transcg-info.zip` 与 `transcg-data-1.zip` 已通过 `unzip -t`，第 1 分块已解压；这**不是** test split 的可用子集，也没有产生任何 benchmark 数字。
+- 官方 Google Drive 在下载第 2–13 分块时返回全局 quota exceeded。已用 gdown 与直接确认 URL 两种方式复核；下载器保留已完整分块并支持之后继续。官方还提供百度入口，但在没有可用的百度账号/下载授权时不能自动化获取。
+
+因此截至此更新，DFNet 仍是“checkpoint + synthetic/GPU forward 已验证、官方全 test 等待上游数据可用”，而不是 full reproduction。
+
 已完成:
 
 - 官方代码已克隆到 `透明物体/external/transcg/official/`，提交为 `135f9e0ad20592cb40b288c152aff5eda033a765`。
