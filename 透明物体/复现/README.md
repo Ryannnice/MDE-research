@@ -6,6 +6,9 @@
 
 本目录原有的 DepthHypothesisPack P0 现在是**支撑感知线**：它验证单层 / 多层透明深度协议并提供 LayeredDepth、SeeGroup、Depth4ToM 工具资产，但不再单独定义总项目的 idea。
 
+想快速了解所有 baseline 的完成度、结果边界和下一步，请先读
+[`复现进度总览_2026-07-27.md`](复现进度总览_2026-07-27.md)。
+
 当前主项目的 G0 是：
 
 ```text
@@ -36,5 +39,5 @@ GT / mesh 薄壳可行性审计
 注意：
 
 - TransCG / ReMake 的 released checkpoint、GPU environment、完整 test runner、原生 cross-check wrapper 与 per-frame cache 已就绪；但官方 Google Drive 当前对 TransCG 第 2–13 分块返回 quota exceeded，尚未得到完整真实 baseline 结果；
-- TablewareNet physical-shell batch oracle、T²SQNet released-model GT-mask runner 和 per-object evaluation 已实现并有端到端测试；正式数据/权重下载正在进行，GT-mask 与 RGB segmentation 必须分行报告；
+- TablewareNet physical-shell batch oracle 与 T²SQNet released-model GT-mask 100-scene full run 已完成；它是 GT-mask oracle，RGB segmentation 仍待做且必须分行报告；
 - 以上记录不能写成已证明 single-depth 会导致实心化，也不能写成机器人提升。
