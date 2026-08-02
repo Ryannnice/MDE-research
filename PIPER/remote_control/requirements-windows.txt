@@ -1,0 +1,4 @@
+python-can>=4.3,<5
+typing-extensions>=4.0
+./vendor/python-can-agx-cando-b222c402.zip
+./vendor/pyAgxArm-799b8412.zip

@@ -1,0 +1,8 @@
+# Runtime authentication material.
+remote_control/session-token.txt
+windows_remote_bootstrap/tunnel_ed25519
+windows_remote_bootstrap/operator_authorized_keys
+windows_remote_bootstrap/known_hosts
+
+# Deployment bundles contain the private tunnel key above. Keep them local.
+piper_windows_remote_bootstrap_v*.zip
