@@ -6,3 +6,7 @@ windows_remote_bootstrap/known_hosts
 
 # Deployment bundles contain the private tunnel key above. Keep them local.
 piper_windows_remote_bootstrap_v*.zip
+
+# Local Python bytecode.
+__pycache__/
+*.pyc
