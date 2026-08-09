@@ -343,6 +343,16 @@ class BridgeControllerTests(unittest.TestCase):
         with self.assertRaisesRegex(BridgeFault, "observe-only"):
             controller.submit_move(self.safe_body(controller))
 
+    def test_state_exposes_flange_pose_for_hand_eye_calibration(self):
+        controller = self.make_controller(allow_motion=False)
+
+        arm = controller.snapshot()["arm"]
+
+        self.assertEqual(arm["flange_pose_m_rad"], [0.3, 0.0, 0.25, 0.0, 0.0, 0.0])
+        self.assertEqual(arm["flange_pose_fk_m_rad"], arm["flange_pose_m_rad"])
+        self.assertEqual(arm["flange_feedback_hz"], 200.0)
+        self.assertEqual(arm["flange_feedback_age_s"], 0.0)
+
     def test_control_requires_local_operator_permit(self):
         controller = self.make_controller()
         with self.assertRaisesRegex(BridgeFault, "ARM WORKSPACE CLEAR"):

@@ -14,7 +14,7 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 
-BRIDGE_VERSION = "0.5.1"
+BRIDGE_VERSION = "0.6.0"
 
 GRIPPER_MIN_WIDTH_M = 0.0
 GRIPPER_MAX_WIDTH_M = 0.07
@@ -208,6 +208,10 @@ class MockBackend:
                 "joint_angles_rad": list(self._joints),
                 "joint_feedback_hz": 200.0,
                 "feedback_age_s": 0.0,
+                "flange_pose_m_rad": [0.3, 0.0, 0.25, 0.0, 0.0, 0.0],
+                "flange_pose_fk_m_rad": [0.3, 0.0, 0.25, 0.0, 0.0, 0.0],
+                "flange_feedback_hz": 200.0,
+                "flange_feedback_age_s": 0.0,
                 "joints_enabled": [self._enabled] * 6,
                 "enabled": self._enabled,
                 "arm_status": {
@@ -391,14 +395,20 @@ class PiperBackend:
         with self._lock:
             robot = self._require_robot()
             joint_msg = robot.get_joint_angles()
+            flange_msg = robot.get_flange_pose()
             status_msg = robot.get_arm_status()
             joint_angles = list(joint_msg.msg) if joint_msg is not None else None
+            flange_pose = list(flange_msg.msg) if flange_msg is not None else None
+            flange_pose_fk = list(robot.fk(joint_angles)) if joint_angles is not None else None
             status = status_msg.msg if status_msg is not None else None
             enabled_list = list(robot.get_joints_enable_status_list())
             now = time.time()
             feedback_age = None
             if joint_msg is not None and joint_msg.timestamp:
                 feedback_age = max(0.0, now - float(joint_msg.timestamp))
+            flange_feedback_age = None
+            if flange_msg is not None and flange_msg.timestamp:
+                flange_feedback_age = max(0.0, now - float(flange_msg.timestamp))
 
             if status is None:
                 arm_status = {"code": None, "name": "NO_FEEDBACK"}
@@ -429,6 +439,12 @@ class PiperBackend:
                     float(joint_msg.hz) if joint_msg is not None else 0.0
                 ),
                 "feedback_age_s": feedback_age,
+                "flange_pose_m_rad": flange_pose,
+                "flange_pose_fk_m_rad": flange_pose_fk,
+                "flange_feedback_hz": (
+                    float(flange_msg.hz) if flange_msg is not None else 0.0
+                ),
+                "flange_feedback_age_s": flange_feedback_age,
                 "joints_enabled": enabled_list,
                 "enabled": bool(enabled_list and all(enabled_list)),
                 "arm_status": arm_status,

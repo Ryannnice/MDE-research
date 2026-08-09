@@ -13,9 +13,9 @@ Set-Location $bridgeRoot
     $bridgeScript `
     --backend real `
     --mode observe `
-    --model piper `
+    --model piper_x `
     --firmware v189 `
     --gripper agx `
     --interface agx_cando `
     --channel 0 `
-    --port 57845 *> $logPath
+    --port 57846 *> $logPath

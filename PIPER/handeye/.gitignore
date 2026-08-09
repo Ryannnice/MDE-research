@@ -1,0 +1,11 @@
+board/*.pdf
+board/*.png
+__pycache__/
+*.py[cod]
+dataset/
+validation_dataset/
+depth_verification/
+results/*
+!results/handeye_final_park.json
+!results/validation_final_park.json
+!results/depth_chain_verification.json

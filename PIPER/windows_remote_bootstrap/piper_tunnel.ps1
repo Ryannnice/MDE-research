@@ -19,7 +19,7 @@ while ($true) {
         & $sshExe `
             -NT `
             -i $keyPath `
-            -p 32736 `
+            -p 30571 `
             -R "127.0.0.1:22022:127.0.0.1:22" `
             -o "BatchMode=yes" `
             -o "IdentitiesOnly=yes" `

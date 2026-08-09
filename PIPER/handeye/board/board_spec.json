@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "board": {
+    "squares_x": 7,
+    "squares_y": 5,
+    "square_length_m": 0.03,
+    "marker_length_m": 0.022,
+    "dictionary": "DICT_5X5_100",
+    "legacy_pattern": false
+  },
+  "page_size_mm": [
+    297.0,
+    210.0
+  ],
+  "board_size_mm": [
+    210.0,
+    150.0
+  ],
+  "dpi": 300,
+  "print_scale": "100%; disable Fit/Shrink/Oversize",
+  "verification": "measure the printed 100 mm bar and 30 mm ChArUco squares",
+  "files": {
+    "png": "piper_charuco_7x5_a4_landscape_300dpi.png",
+    "pdf": "piper_charuco_7x5_a4_landscape.pdf"
+  }
+}

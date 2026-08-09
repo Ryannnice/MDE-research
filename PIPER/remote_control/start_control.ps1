@@ -1,6 +1,6 @@
 param(
     [ValidateSet("piper", "piper_h", "piper_l", "piper_x")]
-    [string]$Model = "piper",
+    [string]$Model = "piper_x",
     [ValidateSet("default", "v183", "v188", "v189")]
     [string]$Firmware = "default",
     [ValidateSet("none", "agx")]

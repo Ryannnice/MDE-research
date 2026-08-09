@@ -18,7 +18,7 @@
 
 - 原厂 AGILE.X 两指夹爪接机械臂末端预留的夹爪线束，由机械臂的 24 V/CAN 链路通信；不要把夹爪接到 D455。
 - Intel RealSense D455 通过 USB 3.x 直接接 Windows 电脑，不与机械臂做电气连接。机械臂状态和 RGB-D 帧后续通过时间戳及手眼标定在软件中对齐。
-- 初次联调建议把 D455 固定在机械臂外部（eye-to-hand），先避免 USB 线随关节运动缠绕。
+- 当前 D455 已固定在末端附近（eye-in-hand）。相机仍通过 USB 3.x 直接连接 Windows；运动前必须确认 USB 线具有应力释放并避开全部关节和夹爪。
 
 夹爪接线完成后，先以只读方式启动；观察模式没有任何夹爪动作路径：
 
@@ -27,6 +27,8 @@ powershell -ExecutionPolicy Bypass -File .\start_observe.ps1 -Firmware v189 -Gri
 ```
 
 `gripper.feedback_present: true`、`gripper.healthy: true` 且所有 `gripper.faults` 为 `false`，才表示反馈链路通过。`driver_enabled` 或 `homed` 为 `false` 会单独显示，并不会被伪装成通信故障。若夹爪并非原厂 AGILE.X 型号，请保持 `-Gripper none`。
+
+从桥 v0.6.0 开始，`state.arm.flange_pose_m_rad` 提供机械臂基座坐标系中的法兰反馈位姿 `[x, y, z, roll, pitch, yaw]`（m/rad），供眼在手上标定使用；`flange_pose_fk_m_rad` 是用同一组反馈关节角计算的离线 FK 交叉检查。对应的反馈频率和新鲜度分别为 `flange_feedback_hz` 与 `flange_feedback_age_s`。当前实机已由“控制器末端反馈与各候选机型 FK”交叉核验为 `piper_x`，三份 Windows 启动脚本均默认使用该机型；切勿改回普通 `piper`，否则手眼标定位姿会明显错误。
 
 ### 夹爪标定与宽度控制
 
@@ -68,13 +70,13 @@ powershell -ExecutionPolicy Bypass -File .\setup_windows.ps1
 
 ## 第一次只读连接
 
-普通 PIPER、固件不明时先运行：
+当前 PIPER-X、固件不明时先运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start_observe.ps1
 ```
 
-其他型号使用 `-Model piper_h`、`piper_l` 或 `piper_x`。固件档位：
+脚本默认 `-Model piper_x`；若把同一套代码用于其他实机，必须显式指定正确的 `-Model piper`、`piper_h` 或 `piper_l`。固件档位：
 
 | 主控固件 | 参数 |
 |---|---|
