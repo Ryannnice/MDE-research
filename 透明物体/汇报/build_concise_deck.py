@@ -317,75 +317,81 @@ def build():
             1.18, 5.83, 10.6, 0.22, 10.8, MUTED)
     footer(slide, "本页为本项目方法设计。")
 
-    # Slide 6 — reproduction status
+    # Slide 6 — reproduction status in plain language
     slide = prs.slides.add_slide(blank)
     background(slide)
-    title(slide, "目前复现进度：哪些是论文协议，哪些是我们的诊断", 6)
+    title(slide, "复现进度：已经证明什么，还缺什么", 6)
 
-    textbox(slide, "官方协议 / benchmark", 0.66, 1.26, 3.1, 0.24, 14, INK, True)
-    chip(slide, "可直接引用", 3.24, 1.21, 1.16, SOFT_TEAL, GREEN)
-    rows_left = [
-        ("Depth4ToM Base path", "Booster 228", "DPT ToM RMSE 136.28 mm", "与论文一致"),
-        ("DPT Base vs SeeGroup", "LayeredDepth val 300", "layer_all 29.95% → 72.41%", "+42.46 pp"),
+    textbox(slide, "已完成的证据", 0.66, 1.27, 2.3, 0.24, 14, INK, True)
+    chip(slide, "结果可信", 6.35, 1.22, 1.22, SOFT_TEAL, GREEN)
+    completed = [
+        ("单层深度基线", "Booster · 228 张", "均方根误差 136.28 mm（约 13.6 cm）", "与论文表格一致", GREEN),
+        ("多层深度对比", "LayeredDepth · 300 张", "4 个界面顺序全对：29.95% → 72.41%", "多层模型明显更完整", TEAL),
+        ("薄壳几何检查", "TablewareNet · 100 个场景", "已知真实物体区域时，界面识别 F1 = 79.15%", "说明几何路线可行，不是论文正式分数", ORANGE),
     ]
-    for i, (method, scope, result, tag) in enumerate(rows_left):
-        y = 1.79 + i * 1.37
-        rect(slide, 0.66, y, 5.89, 1.10, WHITE, LINE, rounded=True)
-        textbox(slide, method, 0.92, y + 0.18, 2.42, 0.20, 11.5, INK, True)
-        textbox(slide, scope, 0.92, y + 0.56, 2.42, 0.18, 9.0, MUTED)
-        textbox(slide, result, 3.34, y + 0.18, 2.73, 0.22, 11.6, TEAL, True, PP_ALIGN.RIGHT)
-        textbox(slide, tag, 3.34, y + 0.58, 2.73, 0.18, 9.2, GREEN, True, PP_ALIGN.RIGHT)
+    for i, (heading, scope, result, note, accent) in enumerate(completed):
+        y = 1.75 + i * 1.23
+        rect(slide, 0.66, y, 7.14, 1.08, WHITE, LINE, rounded=True)
+        rect(slide, 0.66, y, 0.07, 1.08, accent, accent)
+        textbox(slide, heading, 0.92, y + 0.17, 2.08, 0.21, 11.5, INK, True)
+        textbox(slide, scope, 0.92, y + 0.56, 2.08, 0.18, 9.0, MUTED)
+        textbox(slide, result, 3.05, y + 0.16, 4.30, 0.23, 11.1, accent, True, PP_ALIGN.RIGHT)
+        textbox(slide, note, 3.05, y + 0.57, 4.30, 0.18, 8.9, MUTED, False, PP_ALIGN.RIGHT)
 
-    textbox(slide, "我们的诊断 / oracle", 6.86, 1.26, 3.1, 0.24, 14, INK, True)
-    chip(slide, "不能冒充论文分数", 10.76, 1.21, 1.70, SOFT_ORANGE, ORANGE)
-    rows_right = [
-        ("T²SQNet + GT mask", "TablewareNet 100 scenes", "Shell interface F1 79.15%", "受控几何 oracle"),
-        ("TransCG full test", "52 scenes / 23,524 samples", "当前已取得 40 / 52 scenes", "尚无 full metric"),
+    textbox(slide, "仍未完成", 8.06, 1.27, 2.1, 0.24, 14, INK, True)
+    chip(slide, "暂不下结论", 11.27, 1.22, 1.40, SOFT_ORANGE, ORANGE)
+    pending = [
+        ("TransCG 全量测试", "需要 52 个场景 / 23,524 个样本", "已取得 40 / 52 个场景", "缺少 12 个场景，暂不报最终指标"),
+        ("机器人抓取收益", "还没有公平比较单层与多层输入", "尚无抓取成功率结论", "下一页用同一规划器直接验证"),
     ]
-    for i, (method, scope, result, tag) in enumerate(rows_right):
-        y = 1.79 + i * 1.37
-        rect(slide, 6.86, y, 5.81, 1.10, WHITE, LINE, rounded=True)
-        textbox(slide, method, 7.12, y + 0.18, 2.48, 0.20, 11.5, INK, True)
-        textbox(slide, scope, 7.12, y + 0.56, 2.48, 0.18, 9.0, MUTED)
-        textbox(slide, result, 9.56, y + 0.18, 2.63, 0.22, 11.3, ORANGE, True, PP_ALIGN.RIGHT)
-        textbox(slide, tag, 9.56, y + 0.58, 2.63, 0.18, 9.2, ORANGE, True, PP_ALIGN.RIGHT)
+    for i, (heading, scope, result, note) in enumerate(pending):
+        y = 1.75 + i * 1.91
+        rect(slide, 8.06, y, 4.61, 1.70, WHITE, LINE, rounded=True)
+        rect(slide, 8.06, y, 0.07, 1.70, ORANGE, ORANGE)
+        textbox(slide, heading, 8.34, y + 0.21, 4.01, 0.23, 12.2, INK, True)
+        textbox(slide, scope, 8.34, y + 0.60, 4.01, 0.20, 9.3, MUTED)
+        textbox(slide, result, 8.34, y + 0.98, 4.01, 0.22, 11.3, ORANGE, True)
+        textbox(slide, note, 8.34, y + 1.34, 4.01, 0.18, 8.9, MUTED)
 
-    rect(slide, 0.86, 4.92, 11.58, 1.16, SOFT_BLUE, SOFT_BLUE, rounded=True)
-    textbox(slide, "当前能说", 1.15, 5.17, 1.26, 0.22, 12, BLUE, True)
-    textbox(slide, "多层表示在感知协议上优势显著；受控条件下能够恢复大量薄壳界面。",
-            2.28, 5.16, 9.65, 0.24, 13, INK, True)
-    textbox(slide, "当前不能说", 1.15, 5.62, 1.26, 0.22, 12, RED, True)
-    textbox(slide, "已经提升 planner / robot success；Depth4ToM-FT 与 TransCG full test 仍未完成。",
-            2.28, 5.61, 9.65, 0.24, 12.2, MUTED)
-    footer(slide, "本地完整运行：Booster 228、LayeredDepth validation 300、TablewareNet test 100 scenes。")
+    rect(slide, 0.86, 5.72, 11.58, 0.86, SOFT_BLUE, SOFT_BLUE, rounded=True)
+    textbox(slide, "目前结论", 1.14, 6.00, 1.38, 0.22, 12, BLUE, True)
+    textbox(slide, "多层深度能更完整地描述透明物体；是否让机器人抓得更稳，还需要下一步实验。",
+            2.41, 5.96, 9.57, 0.31, 13.2, INK, True)
+    footer(slide, "所有数字都来自本地完整运行；未完成的实验不提前写成结论。")
 
-    # Slide 7 — next work
+    # Slide 7 — next work in plain language
     slide = prs.slides.add_slide(blank)
     background(slide)
-    title(slide, "下一步：先证明规划收益，再训练新 Head", 7)
+    title(slide, "下一步：证明“多层深度是否真的更好抓”", 7)
+    textbox(slide, "保持物体、物体区域和抓取规划器完全相同，只改变输入的几何信息。",
+            0.66, 1.17, 11.4, 0.25, 13.2, MUTED)
+
+    rect(slide, 1.05, 1.66, 11.23, 0.69, SOFT_TEAL, SOFT_TEAL, rounded=True)
+    textbox(slide, "核心问题：只知道最前表面，与知道前后 / 内外表面相比，哪一种抓取错误更少？",
+            1.30, 1.88, 10.73, 0.25, 14.2, TEAL, True, PP_ALIGN.CENTER)
+
     stages = [
-        (1, "Planner oracle", "同一 planner 下比较", "GT-front\nvs GT-events", TEAL),
-        (2, "补齐 native baselines", "完成 TransCG 余下 12 scenes", "DFNet + ReMake\n23,524 samples", BLUE),
-        (3, "统一 failure slice", "按场景报告置信区间", "穿壁 / 空腔 /\n遮挡 / mask", ORANGE),
-        (4, "训练我们的 Head", "仅在 Gate 1 成立后", "DepthHypothesisPack", GREEN),
+        (1, "做公平对比", "方案 A：只给最前表面\n方案 B：给出完整多层界面", "其余条件全部相同", BLUE),
+        (2, "统计三类错误", "① 穿过物体外壁\n② 把空腔当成实心\n③ 抓取位姿碰撞或不可达", "重复实验，比较错误率和波动", ORANGE),
+        (3, "根据结果决定", "错误明显减少：训练我们的多层模型\n没有减少：先修改规划器或评测", "不盲目堆模型", GREEN),
     ]
-    for i, (number, heading, subheading, detail, accent) in enumerate(stages):
-        x = 0.72 + i * 3.10
-        circle(slide, x + 0.99, 1.60, 0.52, accent, str(number))
-        if i < 3:
-            line(slide, x + 1.51, 1.86, x + 3.02, 1.86, LINE, 1.5)
-        textbox(slide, heading, x, 2.43, 2.52, 0.42, 13, INK, True, PP_ALIGN.CENTER)
-        textbox(slide, subheading, x, 3.05, 2.52, 0.38, 10.2, MUTED, False, PP_ALIGN.CENTER)
-        rect(slide, x + 0.10, 3.74, 2.32, 0.82, SOFT, SOFT, rounded=True)
-        textbox(slide, detail, x + 0.20, 3.95, 2.12, 0.38, 10.3, accent, True, PP_ALIGN.CENTER)
+    for i, (number, heading, body, note, accent) in enumerate(stages):
+        x = 0.74 + i * 4.18
+        rect(slide, x, 2.77, 3.77, 2.27, WHITE, LINE, rounded=True)
+        circle(slide, x + 0.22, 3.02, 0.44, accent, str(number))
+        textbox(slide, heading, x + 0.82, 3.06, 2.62, 0.25, 14, INK, True)
+        textbox(slide, body, x + 0.30, 3.60, 3.17, 0.75,
+                10.7, MUTED, False, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+        rect(slide, x + 0.31, 4.50, 3.15, 0.34, SOFT, SOFT, rounded=True)
+        textbox(slide, note, x + 0.39, 4.58, 2.99, 0.18,
+                8.7, accent, True, PP_ALIGN.CENTER)
 
-    rect(slide, 1.12, 5.29, 11.08, 0.78, SOFT_TEAL, SOFT_TEAL, rounded=True)
-    textbox(slide, "Go / No-Go", 1.39, 5.55, 1.36, 0.20, 12, TEAL, True)
-    textbox(slide, "若 GT-events 不能改善固定 planner，就先修 planner / benchmark，而不是继续堆模型。",
-            2.64, 5.51, 9.16, 0.29, 14, INK, True)
-    textbox(slide, "我们真正要证明的是：多层几何 → 更少的抓取规划错误。",
-            2.28, 6.48, 8.76, 0.27, 16, TEAL, True, PP_ALIGN.CENTER)
-    footer(slide, "TransCG 下载仍以断点续传方式轮询 Google Drive 配额。")
+    rect(slide, 0.96, 5.43, 11.41, 0.64, SOFT_BLUE, SOFT_BLUE, rounded=True)
+    textbox(slide, "同时补齐已有方法：TransCG 剩余 12 个场景，并完成 DFNet / ReMake 全量测试。",
+            1.25, 5.63, 10.83, 0.23, 12.0, BLUE, True, PP_ALIGN.CENTER)
+    textbox(slide, "最终要证明的不是“深度图更漂亮”，而是“机械臂少犯抓取错误”。",
+            1.74, 6.46, 9.86, 0.28, 15.4, TEAL, True, PP_ALIGN.CENTER)
+    footer(slide, "先用真实几何验证价值，再投入训练 DepthHypothesisPack。")
 
     prs.save(OUTPUT)
     print(OUTPUT)
