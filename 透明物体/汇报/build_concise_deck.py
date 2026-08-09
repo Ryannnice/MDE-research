@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the concise seven-slide transparent-depth project deck."""
+"""Generate the concise nine-slide transparent-depth project deck."""
 
 from pathlib import Path
 
@@ -278,49 +278,133 @@ def build():
             1.42, 6.04, 10.50, 0.23, 14, INK, True, PP_ALIGN.CENTER)
     footer(slide, "图片截自本地论文 PDF：LayeredDepth、SeeGroup。")
 
-    # Slide 5 — idea
+    # Slide 5 — candidate representation
     slide = prs.slides.add_slide(blank)
     background(slide)
-    title(slide, "Idea：DepthHypothesisPack", 5)
-    textbox(slide, "把感知模型输出变成规划器能直接使用的薄壳事件。",
-            0.61, 1.18, 8.8, 0.26, 14, MUTED)
+    title(slide, "候选技术路线：多界面薄壳表示", 5)
+    textbox(slide, "每个像素不再只有一个深度，而是保留由近到远的界面、类型和不确定性。",
+            0.61, 1.18, 10.8, 0.26, 13.5, MUTED)
+    chip(slide, "候选名称：DepthHypothesisPack", 9.92, 1.13, 2.70, SOFT_TEAL, TEAL)
 
     steps = [
-        (0.74, 2.09, 2.34, "输入", "RGB-D + mask", BLUE),
-        (4.03, 2.09, 4.04, "DepthHypothesisPack", "[d¹, d², d³, d⁴] + 类型 / 置信度", TEAL),
-        (9.03, 2.09, 3.56, "Shell-aware planner", "碰撞、空腔、可达性检查", GREEN),
+        (0.74, 1.78, 2.42, "输入", "RGB + 原始深度\n+ 物体区域", BLUE),
+        (4.00, 1.78, 4.18, "多界面事件包", "[深度, 存在, 类型, 不确定性] × K", TEAL),
+        (9.02, 1.78, 3.58, "薄壳几何与规划", "外壁 / 内壁 / 空腔 / 开口\n碰撞与可达性检查", GREEN),
     ]
     for x, y, w, heading, body, accent in steps:
-        rect(slide, x, y, w, 2.10, WHITE, LINE, rounded=True)
-        rect(slide, x, y, 0.07, 2.10, accent, accent)
-        textbox(slide, heading, x + 0.25, y + 0.32, w - 0.48, 0.29, 15, INK, True, PP_ALIGN.CENTER)
-        textbox(slide, body, x + 0.25, y + 1.00, w - 0.48, 0.50, 12, MUTED, False, PP_ALIGN.CENTER)
-    # Chevron arrows between the three modules.
+        rect(slide, x, y, w, 1.42, WHITE, LINE, rounded=True)
+        rect(slide, x, y, 0.07, 1.42, accent, accent)
+        textbox(slide, heading, x + 0.24, y + 0.25, w - 0.47, 0.27,
+                14, INK, True, PP_ALIGN.CENTER)
+        textbox(slide, body, x + 0.24, y + 0.76, w - 0.47, 0.41,
+                10.5, MUTED, False, PP_ALIGN.CENTER)
     for x in (3.34, 8.34):
         arrow = slide.shapes.add_shape(
-            MSO_AUTO_SHAPE_TYPE.CHEVRON, Inches(x), Inches(2.82), Inches(0.40), Inches(0.54)
+            MSO_AUTO_SHAPE_TYPE.CHEVRON, Inches(x), Inches(2.20), Inches(0.40), Inches(0.54)
         )
         arrow.fill.solid()
         arrow.fill.fore_color.rgb = color(LINE)
         arrow.line.color.rgb = color(LINE)
 
-    textbox(slide, "d¹", 4.50, 3.30, 0.52, 0.22, 13, BLUE, True, PP_ALIGN.CENTER)
-    textbox(slide, "d²", 5.17, 3.30, 0.52, 0.22, 13, TEAL, True, PP_ALIGN.CENTER)
-    textbox(slide, "d³", 5.84, 3.30, 0.52, 0.22, 13, ORANGE, True, PP_ALIGN.CENTER)
-    textbox(slide, "d⁴", 6.51, 3.30, 0.52, 0.22, 13, GREEN, True, PP_ALIGN.CENTER)
+    rect(slide, 0.88, 3.55, 11.57, 1.54, SOFT, SOFT, rounded=True)
+    textbox(slide, "同一像素的一条相机射线", 1.15, 3.81, 2.10, 0.22, 11.5, INK, True)
+    line(slide, 3.05, 4.18, 11.58, 4.18, MUTED, 1.3)
+    line(slide, 4.12, 4.18, 5.28, 4.18, ORANGE, 5.0)
+    line(slide, 5.28, 4.18, 8.90, 4.18, TEAL, 5.0)
+    line(slide, 8.90, 4.18, 10.06, 4.18, ORANGE, 5.0)
+    ray_events = [
+        (3.99, "d¹", "空气→材料", BLUE),
+        (5.15, "d²", "材料→空腔", ORANGE),
+        (8.77, "d³", "空腔→材料", TEAL),
+        (9.93, "d⁴", "材料→空气", GREEN),
+    ]
+    for x, depth, transition, accent in ray_events:
+        circle(slide, x, 4.04, 0.28, accent)
+        textbox(slide, depth, x - 0.10, 3.72, 0.48, 0.18,
+                10, accent, True, PP_ALIGN.CENTER)
+        textbox(slide, transition, x - 0.34, 4.55, 0.96, 0.18,
+                8.2, MUTED, False, PP_ALIGN.CENTER)
+    textbox(slide, "材料", 4.34, 4.53, 0.72, 0.18, 8.6, ORANGE, True, PP_ALIGN.CENTER)
+    textbox(slide, "空腔", 6.77, 4.53, 0.72, 0.18, 8.6, TEAL, True, PP_ALIGN.CENTER)
+    textbox(slide, "材料", 9.13, 4.53, 0.72, 0.18, 8.6, ORANGE, True, PP_ALIGN.CENTER)
 
-    rect(slide, 0.89, 5.02, 11.58, 1.22, SOFT, SOFT, rounded=True)
-    textbox(slide, "关键不是“多输出几张 depth map”", 1.18, 5.29, 4.10, 0.26, 15, INK, True)
-    textbox(slide, "而是保留事件顺序与几何语义，让 planner 知道哪里是壁、哪里是空腔。",
-            5.09, 5.28, 6.97, 0.45, 13, TEAL, True)
-    textbox(slide, "当前状态：Idea 已确定；Head 尚未训练，先通过下游可行性 Gate。",
-            1.18, 5.83, 10.6, 0.22, 10.8, MUTED)
-    footer(slide, "本页为本项目方法设计。")
+    rect(slide, 0.93, 5.49, 11.47, 0.90, SOFT_ORANGE, SOFT_ORANGE, rounded=True)
+    textbox(slide, "当前边界", 1.21, 5.78, 1.28, 0.20, 11.5, ORANGE, True)
+    textbox(slide, "表示定义与评测工具已经实现；多界面预测网络尚未训练，抓取收益尚未验证。",
+            2.42, 5.74, 9.55, 0.28, 13.2, INK, True)
+    footer(slide, "本页是候选方法设计，不是已经完成的模型结果。")
 
-    # Slide 6 — reproduction status in plain language
+    # Slide 6 — implemented ShellBench infrastructure
     slide = prs.slides.add_slide(blank)
     background(slide)
-    title(slide, "复现进度：已经证明什么，还缺什么", 6)
+    title(slide, "已经实现：ShellBench 统一表示与评测工具", 6)
+    textbox(slide, "它不是一个新模型，而是让单层、多层和完整真值在同一规则下公平比较。",
+            0.66, 1.16, 10.9, 0.25, 13.2, MUTED)
+    chip(slide, "代码与测试已完成", 10.84, 1.11, 1.80, SOFT_TEAL, GREEN)
+
+    sources = [
+        (1.64, "单层深度", "K = 1；不虚构后表面", BLUE),
+        (2.55, "多层预测", "K 可变；保留深度顺序", TEAL),
+        (3.46, "完整真值", "TablewareNet 射线求交", ORANGE),
+    ]
+    for y, heading, note, accent in sources:
+        rect(slide, 0.67, y, 2.61, 0.68, WHITE, LINE, rounded=True)
+        rect(slide, 0.67, y, 0.07, 0.68, accent, accent)
+        textbox(slide, heading, 0.91, y + 0.13, 1.02, 0.20, 10.8, INK, True)
+        textbox(slide, note, 1.91, y + 0.11, 1.11, 0.40, 7.9, MUTED, False, PP_ALIGN.RIGHT)
+
+    arrow = slide.shapes.add_shape(
+        MSO_AUTO_SHAPE_TYPE.CHEVRON, Inches(3.45), Inches(2.55), Inches(0.38), Inches(0.54)
+    )
+    arrow.fill.solid()
+    arrow.fill.fore_color.rgb = color(LINE)
+    arrow.line.color.rgb = color(LINE)
+
+    rect(slide, 3.99, 1.92, 3.45, 2.03, SOFT_TEAL, SOFT_TEAL, rounded=True)
+    textbox(slide, "统一 RayEvents", 4.30, 2.19, 2.83, 0.25, 14.2, TEAL, True, PP_ALIGN.CENTER)
+    textbox(slide, "depths_m        [K,H,W]\nvalid_mask       [K,H,W]\ntransition_type  [K,H,W]\nuncertainty_m    可选",
+            4.42, 2.67, 2.59, 0.89, 10.2, INK, False, PP_ALIGN.LEFT)
+
+    arrow = slide.shapes.add_shape(
+        MSO_AUTO_SHAPE_TYPE.CHEVRON, Inches(7.60), Inches(2.55), Inches(0.38), Inches(0.54)
+    )
+    arrow.fill.solid()
+    arrow.fill.fore_color.rgb = color(LINE)
+    arrow.line.color.rgb = color(LINE)
+
+    rect(slide, 8.14, 1.64, 4.53, 2.70, WHITE, LINE, rounded=True)
+    textbox(slide, "统一评分", 8.48, 1.93, 3.85, 0.25, 14.2, INK, True, PP_ALIGN.CENTER)
+    metric_rows = [
+        ("界面是否找全", "Precision / Recall / F1"),
+        ("界面数量是否正确", "Event-count accuracy"),
+        ("深度偏差", "匹配后的 MAE / RMSE"),
+        ("材料转换是否正确", "Transition / topology"),
+    ]
+    for i, (meaning, metric) in enumerate(metric_rows):
+        y = 2.40 + i * 0.43
+        textbox(slide, meaning, 8.48, y, 1.82, 0.18, 9.4, MUTED)
+        textbox(slide, metric, 10.22, y, 2.02, 0.18, 9.4, BLUE, True, PP_ALIGN.RIGHT)
+
+    rect(slide, 0.93, 4.73, 11.47, 0.60, SOFT, SOFT, rounded=True)
+    textbox(slide, "合法拓扑：空气 → 材料 → 空腔 → 材料 → 空气",
+            1.22, 4.93, 4.69, 0.21, 11.6, TEAL, True)
+    textbox(slide, "坐标链：(u,v,dₖ) → 相机点 → 手眼外参 → PIPER Base 薄壳",
+            6.02, 4.93, 5.99, 0.21, 10.8, INK, True, PP_ALIGN.RIGHT)
+
+    rect(slide, 0.93, 5.65, 5.48, 0.76, SOFT_TEAL, SOFT_TEAL, rounded=True)
+    textbox(slide, "已经完成", 1.20, 5.88, 1.10, 0.20, 11.4, GREEN, True)
+    textbox(slide, "数据格式 · 转换器 · 真值生成 · 评测 · 单元/集成测试",
+            2.23, 5.86, 3.86, 0.27, 9.8, INK, True)
+    rect(slide, 6.62, 5.65, 5.78, 0.76, SOFT_ORANGE, SOFT_ORANGE, rounded=True)
+    textbox(slide, "尚未完成", 6.90, 5.88, 1.10, 0.20, 11.4, ORANGE, True)
+    textbox(slide, "预测网络 · 三维薄壳提升 · 规划器对照 · 实机闭环",
+            7.93, 5.86, 4.13, 0.27, 9.8, INK, True)
+    footer(slide, "ShellBench 已能评价表示质量，但尚未产生机器人抓取成功率结论。")
+
+    # Slide 7 — reproduction status in plain language
+    slide = prs.slides.add_slide(blank)
+    background(slide)
+    title(slide, "复现进度：已经证明什么，还缺什么", 7)
 
     textbox(slide, "已完成的证据", 0.66, 1.27, 2.3, 0.24, 14, INK, True)
     chip(slide, "结果可信", 6.35, 1.22, 1.22, SOFT_TEAL, GREEN)
@@ -359,10 +443,10 @@ def build():
             2.41, 5.96, 9.57, 0.31, 13.2, INK, True)
     footer(slide, "所有数字都来自本地完整运行；未完成的实验不提前写成结论。")
 
-    # Slide 7 — next work in plain language
+    # Slide 8 — next work in plain language
     slide = prs.slides.add_slide(blank)
     background(slide)
-    title(slide, "下一步：证明“多层深度是否真的更好抓”", 7)
+    title(slide, "下一步：证明“多层深度是否真的更好抓”", 8)
     textbox(slide, "保持物体、物体区域和抓取规划器完全相同，只改变输入的几何信息。",
             0.66, 1.17, 11.4, 0.25, 13.2, MUTED)
 
@@ -391,7 +475,54 @@ def build():
             1.25, 5.63, 10.83, 0.23, 12.0, BLUE, True, PP_ALIGN.CENTER)
     textbox(slide, "最终要证明的不是“深度图更漂亮”，而是“机械臂少犯抓取错误”。",
             1.74, 6.46, 9.86, 0.28, 15.4, TEAL, True, PP_ALIGN.CENTER)
-    footer(slide, "先用真实几何验证价值，再投入训练 DepthHypothesisPack。")
+    footer(slide, "先用真实几何验证价值，再投入训练多界面预测模型。")
+
+    # Slide 9 — technical appendix
+    slide = prs.slides.add_slide(blank)
+    background(slide)
+    title(slide, "技术备用页：匹配、指标与因果对照", 9)
+    chip(slide, "追问时展示", 11.18, 1.12, 1.46, SOFT_BLUE, BLUE)
+
+    rect(slide, 0.66, 1.48, 5.86, 2.94, WHITE, LINE, rounded=True)
+    textbox(slide, "1｜有序界面匹配", 0.96, 1.78, 2.75, 0.25, 14, INK, True)
+    textbox(slide, "真值", 0.98, 2.30, 0.55, 0.20, 9.5, MUTED, True)
+    textbox(slide, "0.400   0.405   0.490   0.495 m", 1.63, 2.28, 3.95, 0.22,
+            11.0, TEAL, True, PP_ALIGN.CENTER)
+    textbox(slide, "预测", 0.98, 2.76, 0.55, 0.20, 9.5, MUTED, True)
+    textbox(slide, "0.402      缺失      0.492   0.497 m", 1.63, 2.74, 3.95, 0.22,
+            11.0, ORANGE, True, PP_ALIGN.CENTER)
+    line(slide, 1.80, 3.18, 5.49, 3.18, LINE, 0.9)
+    textbox(slide, "动态规划按三个规则匹配：", 0.98, 3.42, 2.42, 0.20, 10.2, INK, True)
+    textbox(slide, "① 保持由近到远　② 先让匹配数最多　③ 再让总误差最小",
+            0.98, 3.80, 5.09, 0.22, 10.0, MUTED)
+    textbox(slide, "只有误差 ≤ δ 的界面可匹配；δ 可配置，示例为 5 mm。",
+            0.98, 4.12, 5.09, 0.18, 8.8, BLUE, True)
+
+    rect(slide, 6.81, 1.48, 5.86, 2.94, WHITE, LINE, rounded=True)
+    textbox(slide, "2｜评分指标", 7.11, 1.78, 2.40, 0.25, 14, INK, True)
+    rect(slide, 7.10, 2.27, 2.46, 1.39, SOFT_BLUE, SOFT_BLUE, rounded=True)
+    textbox(slide, "P = 匹配数 / 预测数\nR = 匹配数 / 真值数\nF1 = 2PR / (P + R)",
+            7.34, 2.55, 1.98, 0.72, 10.4, BLUE, True, PP_ALIGN.CENTER)
+    rect(slide, 9.82, 2.27, 2.46, 1.39, SOFT_TEAL, SOFT_TEAL, rounded=True)
+    textbox(slide, "界面数量正确率\n匹配深度 MAE / RMSE\n类型 F1 / 拓扑合法率",
+            10.05, 2.53, 2.00, 0.78, 10.0, TEAL, True, PP_ALIGN.CENTER)
+    textbox(slide, "漏掉后层会降低 Recall；多报假界面会降低 Precision，不能只看匹配后的深度误差。",
+            7.16, 3.90, 5.14, 0.27, 9.3, MUTED, True, PP_ALIGN.CENTER)
+
+    textbox(slide, "3｜三组因果对照", 0.70, 4.73, 2.84, 0.25, 14, INK, True)
+    comparisons = [
+        (0.70, "A｜GT-front + 固定规划器", "只给最前表面\n建立单层基准", BLUE),
+        (4.50, "B｜GT-full + 同一规划器", "只替换完整薄壳几何\n隔离“表示”的收益", TEAL),
+        (8.30, "C｜GT-full + 薄壳规划器", "表示与规划共同正确\n估计系统上界", GREEN),
+    ]
+    for x, heading, body, accent in comparisons:
+        rect(slide, x, 5.14, 3.56, 1.24, WHITE, LINE, rounded=True)
+        rect(slide, x, 5.14, 0.07, 1.24, accent, accent)
+        textbox(slide, heading, x + 0.22, 5.39, 3.10, 0.23,
+                11.1, INK, True, PP_ALIGN.CENTER)
+        textbox(slide, body, x + 0.26, 5.83, 3.02, 0.39,
+                9.4, MUTED, False, PP_ALIGN.CENTER)
+    footer(slide, "对象、候选抓取、规划器参数和数据划分全部冻结；GT 只用于离线审计，不参与候选生成。")
 
     prs.save(OUTPUT)
     print(OUTPUT)
