@@ -58,6 +58,34 @@ cd C:\Desktop\PIPER\camera
 - `combined_preview.png`：RGB 与深度并排图；
 - `metadata.json`：设备、内参、外参、帧率、时间戳、IMU 和深度质量。
 
+## D455 + PIPER-X 统一时间戳快照
+
+手眼标定完成后，可在 observe 桥运行时采集一组 RGB、对齐深度、IMU、关节、法兰、夹爪与 Base 坐标点云：
+
+```powershell
+cd C:\Desktop\PIPER\camera
+.\.venv\Scripts\python.exe .\synchronized_snapshot.py `
+    --output .\captures\synchronized_latest
+```
+
+工具没有运动接口。它使用 D455 `global_time` 曝光时间，同时在后台以 100 Hz 读取本机观察桥，并从环形缓冲中选取最接近曝光时刻的法兰反馈。只有以下条件全部满足才保存：
+
+- 桥为 `observe`，机械臂型号为 `piper_x`；
+- RGB 与深度时间差不超过 5 ms；
+- 法兰反馈与相机曝光时间差不超过 8 ms；
+- 被选中的桥请求往返时间不超过 10 ms；
+- Base 点云有效点不少于 10,000。
+
+输出：
+
+- `snapshot.json`：统一时间、机器人/夹爪状态、相机内参、三段坐标矩阵和验收项；
+- `color.png`、`aligned_depth_raw.png`、`depth_preview.png`；
+- `base_point_cloud.ply`：带 RGB 的二进制 PLY，坐标单位为米，坐标系为 PIPER Base。
+
+2026-08-09 静态实测：RGB/深度时间差 `0.035 ms`，法兰/曝光时间差 `5.420 ms`，桥往返 `4.094 ms`，生成 `308,677` 个 Base 点；所有验收项通过。正式摘要保存在 `results/synchronized_snapshot_final.json`。点云中约 `90.6%` 的点位于已知桌面高度 ±3 cm 内，进一步核验了 Base 坐标方向与尺度。
+
+这一步验证的是静态/慢速快照。后续连续运动数据集应沿用同一时间基准做多帧记录，并对相邻法兰位姿插值，不能把单帧快照工具直接宣称为高速硬件同步。
+
 ## 2026-08-02 实机结果
 
 同一静止姿态下完成了四组 848×480@30 Hz 采样：

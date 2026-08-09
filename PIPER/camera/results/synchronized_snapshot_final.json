@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "ok": true,
+  "captured_at_utc": "2026-08-09T11:18:43.039537+00:00",
+  "configuration": "d455_aligned_depth_robot_snapshot",
+  "camera": {
+    "name": "Intel RealSense D455",
+    "serial_number": "260722303168",
+    "firmware_version": "5.17.3.10",
+    "usb_type_descriptor": "3.2",
+    "color": {
+      "frame_number": 42,
+      "timestamp_ms": 1786274318883.07,
+      "timestamp_domain": "timestamp_domain.global_time",
+      "frame_timestamp": 1025666287,
+      "sensor_timestamp": 1025666204,
+      "backend_timestamp": 1786274318886,
+      "time_of_arrival": 1786274318920,
+      "frame_counter": 42
+    },
+    "depth": {
+      "frame_number": 31,
+      "timestamp_ms": 1786274318883.0352,
+      "timestamp_domain": "timestamp_domain.global_time",
+      "frame_timestamp": 1025666253,
+      "sensor_timestamp": 1025657872,
+      "backend_timestamp": 1786274318880,
+      "time_of_arrival": 1786274318914,
+      "frame_counter": 31
+    },
+    "accel_m_s2": {
+      "frame_number": 356,
+      "timestamp_ms": 1786274318930.1714,
+      "x": 0.019613299518823624,
+      "y": -0.18632633984088898,
+      "z": -9.63012981414795,
+      "norm": 9.631952160583946
+    },
+    "gyro_rad_s": {
+      "frame_number": 335,
+      "timestamp_ms": 1786274318930.6316,
+      "x": -0.001595230889506638,
+      "y": 0.0,
+      "z": 0.0005323254154063761,
+      "norm": 0.001681705068888035
+    },
+    "aligned_intrinsics": {
+      "width": 848,
+      "height": 480,
+      "fx": 427.287841796875,
+      "fy": 426.6799621582031,
+      "ppx": 434.997314453125,
+      "ppy": 246.87083435058594,
+      "distortion_model": "distortion.inverse_brown_conrady",
+      "coefficients": [
+        -0.054839134216308594,
+        0.059502772986888885,
+        -0.0008748408872634172,
+        0.00010918318730546162,
+        -0.019037337973713875
+      ]
+    },
+    "depth_scale_m_per_unit": 0.0010000000474974513,
+    "global_time_options": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "synchronization": {
+    "strategy": "background_flange_buffer_nearest_to_d455_global_timestamp",
+    "frame_unix_ns": 1786274318883069952,
+    "selected_robot_sample": "sample_199",
+    "flange_feedback_offset_ms": 5.420313,
+    "color_depth_skew_ms": 0.034912109375,
+    "bridge_query_roundtrip_ms": 4.0941,
+    "limits": {
+      "maximum_flange_offset_ms": 8.0,
+      "maximum_color_depth_skew_ms": 5.0,
+      "maximum_bridge_roundtrip_ms": 10.0
+    },
+    "robot_sampler": {
+      "requested_rate_hz": 100.0,
+      "observed_rate_hz": 73.69990820549364,
+      "buffered_record_count": 204
+    },
+    "before": {
+      "query_started_unix_ns": 1786274318874914500,
+      "query_finished_unix_ns": 1786274318889471600,
+      "query_midpoint_unix_ns": 1786274318882193050,
+      "roundtrip_ms": 14.5571,
+      "flange_measurement_unix_ns": 1786274318870498380,
+      "joint_measurement_unix_ns": 1786274318870498380
+    },
+    "after": {
+      "query_started_unix_ns": 1786274318890537100,
+      "query_finished_unix_ns": 1786274318894631200,
+      "query_midpoint_unix_ns": 1786274318892584150,
+      "roundtrip_ms": 4.0941,
+      "flange_measurement_unix_ns": 1786274318888490265,
+      "joint_measurement_unix_ns": 1786274318891500061
+    }
+  },
+  "robot": {
+    "bridge_version": "0.6.0",
+    "bridge_mode": "observe",
+    "model": "piper_x",
+    "firmware": {
+      "hardware_version": "H-V1.2-1",
+      "motor_ratio_and_batch": "10",
+      "node_type": "Piper_",
+      "software_version": "S-V1.8-9",
+      "production_date": "260616",
+      "node_number": "15"
+    },
+    "healthy": true,
+    "arm_status": {
+      "code": 0,
+      "name": "NORMAL"
+    },
+    "ctrl_mode": {
+      "code": 2,
+      "name": "TEACHING_MODE"
+    },
+    "teach_status": {
+      "code": 2,
+      "name": "STOP_RECORDING"
+    },
+    "joint_angles_rad": [
+      0.11676252695842065,
+      1.3682683203934747,
+      -1.6915032978628244,
+      1.5660315779369522,
+      0.017296212887263806,
+      0.09665633397544597
+    ],
+    "joint_feedback_hz": 220.0,
+    "flange_pose_m_rad": [
+      0.264893,
+      0.030459999999999997,
+      0.435824,
+      -2.726780250268301,
+      0.02314306588144481,
+      -1.549450950043006
+    ],
+    "flange_feedback_hz": 220.0,
+    "gripper": {
+      "configured": true,
+      "driver": "agx_gripper",
+      "feedback_present": true,
+      "healthy": true,
+      "driver_ok": true,
+      "value": 0.0819,
+      "unit": "m",
+      "mode": "width",
+      "force_n": -0.007,
+      "feedback_hz": 220.0,
+      "feedback_age_s": 0.0010840892791748047,
+      "status_code": 64,
+      "driver_enabled": true,
+      "homed": false,
+      "faults": {
+        "voltage_too_low": false,
+        "motor_overheating": false,
+        "driver_overcurrent": false,
+        "driver_overheating": false,
+        "sensor_status": false,
+        "driver_error_status": false
+      },
+      "read_error": null
+    }
+  },
+  "calibration": {
+    "path": "C:\\Desktop\\PIPER\\handeye\\results\\handeye_final_park.json",
+    "sha256": "364e578e1ce82d547e990c1bed39d66ecb869b7e741b45779576384c79e308d6",
+    "method": "PARK"
+  },
+  "coordinate_chain": {
+    "base_from_flange": [
+      [
+        0.021338040255183894,
+        -0.9151825142893644,
+        0.40247441356819874,
+        0.264893
+      ],
+      [
+        -0.9995044683020857,
+        -0.010209512586085727,
+        0.02977555535870749,
+        0.030459999999999997
+      ],
+      [
+        -0.023141000026642083,
+        -0.4029103267375408,
+        -0.9149468633347049,
+        0.435824
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "flange_from_camera": [
+      [
+        0.9998489417427645,
+        -0.0153079363753887,
+        0.008231693616847877,
+        0.01191403190496483
+      ],
+      [
+        0.011393842767705123,
+        0.9349201768763141,
+        0.35467512348139996,
+        -0.09816626245786213
+      ],
+      [
+        -0.013125320676441926,
+        -0.35452775625257976,
+        0.9349533656838999,
+        0.04639215589943674
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "base_from_camera": [
+      [
+        0.005624765554298543,
+        -0.9986375902875305,
+        0.05187798451340753,
+        0.3736589247267558
+      ],
+      [
+        -0.9998606241925478,
+        -0.004800989337616226,
+        0.015990081008842773,
+        0.020935453773780047
+      ],
+      [
+        -0.015719230316666923,
+        -0.051960694434295775,
+        -0.9985254088064848,
+        0.4326541407453459
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "point_cloud": {
+    "coordinate_frame": "piper_base",
+    "point_count": 308677,
+    "valid_pixel_fraction": 0.7583456171383648,
+    "camera_depth_m": {
+      "minimum": 0.4270000159740448,
+      "median": 0.4390000104904175,
+      "maximum": 2.997000217437744
+    },
+    "base_bounds_m": {
+      "minimum": [
+        -0.9108028411865234,
+        -0.33914539217948914,
+        -2.6359896659851074
+      ],
+      "maximum": [
+        1.5225151777267456,
+        1.169276475906372,
+        0.009152950718998909
+      ]
+    }
+  },
+  "acceptance": {
+    "observe_bridge": true,
+    "piper_x_model": true,
+    "global_camera_time": true,
+    "video_skew_within_limit": true,
+    "bridge_rtt_within_limit": true,
+    "flange_timestamp_bracketed": true,
+    "flange_sync_within_limit": true,
+    "minimum_point_count": true
+  },
+  "files": {
+    "color": "color.png",
+    "aligned_depth_raw": "aligned_depth_raw.png",
+    "depth_preview": "depth_preview.png",
+    "base_point_cloud": "base_point_cloud.ply"
+  }
+}

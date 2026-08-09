@@ -20,6 +20,12 @@ Server-side recovery:
   `sshd` child that owns a stale port-22022 listener, then waits for the Windows
   scheduled task to reconnect.
 
+Replacing the school server:
+- Keep the ignored PIPER/.server_recovery directory on the mounted workspace.
+- On the new server run `bash PIPER/restore_new_server.sh <host> <port>`.
+- Run the one printed command in an elevated Windows PowerShell. The repoint
+  script is already installed at C:\ProgramData\PiperRemote.
+
 Repository note:
 - tunnel_ed25519, operator_authorized_keys, known_hosts, and generated
   piper_windows_remote_bootstrap_v*.zip bundles are deployment-specific.
