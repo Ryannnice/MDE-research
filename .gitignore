@@ -17,3 +17,7 @@ analysis/
 
 # 按 commit 固定、但不纳入主仓库的上游复现代码
 /透明物体/external/
+
+# 本地下载客户端与认证状态（第三方二进制、Cookie/登录配置）
+/透明物体/复现/tools/transcg/bin/
+/透明物体/复现/tools/transcg/.baidupcs/

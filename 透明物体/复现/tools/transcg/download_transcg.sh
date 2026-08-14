@@ -13,6 +13,24 @@ project_root="${workspace_root}/透明物体"
 data_root="${TRANSCG_ROOT:-${project_root}/data/transcg}"
 download_root="${TRANSCG_DOWNLOAD_ROOT:-${data_root}/downloads}"
 gdown_bin="${GDOWN:-gdown}"
+if ! command -v "$gdown_bin" >/dev/null 2>&1; then
+  # The project environments install gdown independently; make the downloader
+  # usable from a clean shell without requiring callers to activate one first.
+  if command -v conda >/dev/null 2>&1; then
+    conda_base="$(conda info --base 2>/dev/null || true)"
+    for env_name in transcg transparent-baselines-gpu remake; do
+      candidate="${conda_base}/envs/${env_name}/bin/gdown"
+      if [[ -x "$candidate" ]]; then
+        gdown_bin="$candidate"
+        break
+      fi
+    done
+  fi
+fi
+if ! command -v "$gdown_bin" >/dev/null 2>&1; then
+  echo "gdown is required. Install it or set GDOWN=/path/to/gdown." >&2
+  exit 127
+fi
 
 declare -A archive_ids=(
   [info]="18LkbelKNTURF-8f8N-ykzs79FJ013knH"
@@ -63,9 +81,16 @@ fetch_and_extract() {
   fi
   local archive="${download_root}/${filename}"
   echo "==> ${filename}"
-  "$gdown_bin" --continue "${archive_ids[$label]}" -O "$archive"
-  unzip -tq "$archive"
-  unzip -nq "$archive" -d "$data_root"
+  if ! "$gdown_bin" --continue "${archive_ids[$label]}" -O "$archive"; then
+    return 1
+  fi
+  if ! unzip -tq "$archive"; then
+    return 1
+  fi
+  if ! unzip -nq "$archive" -d "$data_root"; then
+    return 1
+  fi
+  touch "${archive}.verified"
 }
 
 if [[ ! -f "${data_root}/transcg/metadata.json" ]]; then
