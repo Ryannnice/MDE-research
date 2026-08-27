@@ -19,6 +19,11 @@ from typing import Any
 
 import numpy as np
 
+# TransCG's released 2022 preprocessing uses the removed ``np.bool`` alias.
+# Keep the upstream code untouched while restoring its original boolean dtype.
+if "bool" not in np.__dict__:
+    np.bool = np.bool_  # type: ignore[attr-defined]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -78,10 +83,14 @@ def main() -> None:
         require_complete_test_split(dataset_root)
 
     sys.path.insert(0, str(official_root))
+    # The upstream checkout names its local package ``datasets`` but does not
+    # ship datasets/__init__.py.  Environments that also install Hugging Face
+    # datasets would otherwise resolve that third-party package first.
+    sys.path.insert(0, str(official_root / "datasets"))
     import torch
     from torch.utils.data import DataLoader, Subset
 
-    from datasets.transcg import TransCG
+    from transcg import TransCG
     from models.DFNet import DFNet
     from utils.functions import to_device
     from utils.metrics import MetricsRecorder
