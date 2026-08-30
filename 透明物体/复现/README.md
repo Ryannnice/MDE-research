@@ -15,17 +15,18 @@
 - DFNet 已跑完当前官方 release 的原生全量评测；官方明确说明当前 checkpoint 不同于论文原 checkpoint，因此不能宣称逐项复现论文旧表。
 - T²SQNet 已完成 100-scene `GT-mask` 与完整 RGB/LangSAM inference；ShellBench 在其中 98 个含 hollow GT 的 scene 上评分，不能冒充 T²SQNet 论文表格指标。
 - fixed-planner 表示 oracle 已完成：同一 7,983 个候选上，front optimistic 的 safe selection 为 224/244，full events 为 244/244；表示层 G0 gate `PASS`。
+- DFNet、ReMake 和 rendered-front upper bound 已接入同一 ShellBench 与 frozen planner；完美 visible front 的 interface F1 仍只有 43.104%，actual OOD 模型的 optimistic 策略均产生 21/244 个 selected collision。
 - Depth4ToM 的公开 Base 路径已复现；FT checkpoint 未公开可用，Base 结果不得改名为 FT。
-- LayeredDepth / SeeGroup 的 P0 gap 已成立：DPT Base 与 SeeGroup 的 `layer_all` quad 相差 42.457 个百分点。
+- LayeredDepth / SeeGroup 的 P0 gap 已成立：取 MiDaS/DPT 中较强的 MiDaS Base，`layer_all` quad 与 SeeGroup 仍相差 37.572 个百分点。
 
 ## 结果应该放在哪张表
 
 | 表 | 可放方法 | 不应混入 |
 | --- | --- | --- |
 | TransCG metric depth completion | DFNet current release、ReMake、raw input depth | T²SQNet ShellBench、SeeGroup cross-protocol 读数 |
-| LayeredDepth multi-layer | DPT Base、SeeGroup | Booster ToM RMSE |
-| ShellBench multi-interface | T²SQNet RGB、T²SQNet GT-mask oracle、后续 Head | TransCG 论文指标 |
-| fixed-planner collision diagnostic | front/events oracles、后续各方法 event readout | 机器人 task success 声明 |
+| LayeredDepth multi-layer | MiDaS/DPT Base、SeeGroup | Booster ToM RMSE |
+| ShellBench multi-interface | DFNet/ReMake OOD readout、T²SQNet RGB、T²SQNet GT-mask oracle、后续 Head | TransCG 论文指标 |
+| fixed-planner collision diagnostic | front/events oracles、DFNet/ReMake readout、后续各方法 event readout | 机器人 task success 声明 |
 
 ## 目录导航
 

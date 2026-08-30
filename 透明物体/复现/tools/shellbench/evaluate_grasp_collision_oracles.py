@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import pickle
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -40,6 +41,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ground-truth-root", type=Path, required=True)
     parser.add_argument("--prediction-objects-root", type=Path, required=True)
     parser.add_argument("--output-json", type=Path, required=True)
+    parser.add_argument(
+        "--single-depth-root",
+        action="append",
+        default=[],
+        metavar="LABEL=DIR",
+        help=(
+            "repeatable output of adapt_tablewarenet_depth_baseline.py; "
+            "adds optimistic/conservative collision policies on the same candidates"
+        ),
+    )
     parser.add_argument("--max-centre-distance-m", type=float, default=0.10)
     parser.add_argument("--surface-band-m", type=float, default=0.002)
     parser.add_argument("--gripper-points", type=int, default=2048)
@@ -61,6 +72,23 @@ def parse_args() -> argparse.Namespace:
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def parse_labeled_roots(values: list[str]) -> dict[str, Path]:
+    roots: dict[str, Path] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"single-depth-root must be LABEL=DIR, got {value!r}")
+        label, raw_path = value.split("=", 1)
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", label):
+            raise ValueError(f"Invalid single-depth label: {label!r}")
+        if label in roots:
+            raise ValueError(f"Duplicate single-depth label: {label}")
+        root = Path(raw_path).expanduser().resolve()
+        if not (root / "manifest.json").is_file() or not (root / "metrics.json").is_file():
+            raise FileNotFoundError(f"Not a completed single-depth ShellBench adapter: {root}")
+        roots[label] = root
+    return roots
 
 
 def bounded_uniform_sampling_2d(
@@ -430,6 +458,17 @@ def main() -> None:
     gt_root = args.ground_truth_root.resolve()
     objects_root = args.prediction_objects_root.resolve()
     output_json = args.output_json.resolve()
+    single_depth_roots = parse_labeled_roots(args.single_depth_root)
+    single_depth_metadata = {
+        label: load_json(root / "metrics.json")
+        for label, root in single_depth_roots.items()
+    }
+    single_depth_policies = [
+        f"{label}_fixed_{unknown_policy}"
+        for label in single_depth_roots
+        for unknown_policy in ("conservative", "optimistic")
+    ]
+    evaluation_policies = [*POLICIES, *single_depth_policies]
     if not (official_root / "tablewarenet" / "tableware.py").is_file():
         raise FileNotFoundError(f"Not a T²SQNet checkout: {official_root}")
     gt_payload = load_json(gt_root / "manifest.json")
@@ -473,10 +512,10 @@ def main() -> None:
     gt_by_scene: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for item in gt_payload["items"]:
         gt_by_scene[str(item["scene_id"])].append(item)
-    totals = {policy: empty_counts() for policy in POLICIES}
+    totals = {policy: empty_counts() for policy in evaluation_policies}
     scene_counts: dict[str, dict[str, dict[str, int]]] = {}
     class_counts: dict[str, dict[str, dict[str, int]]] = defaultdict(
-        lambda: {policy: empty_counts() for policy in POLICIES}
+        lambda: {policy: empty_counts() for policy in evaluation_policies}
     )
     object_records: list[dict[str, Any]] = []
     matching_totals = {"gt_objects": 0, "predicted_objects": 0, "matched_objects": 0}
@@ -492,7 +531,7 @@ def main() -> None:
         matching_totals["gt_objects"] += len(gt_objects)
         matching_totals["predicted_objects"] += len(predicted_objects)
         matching_totals["matched_objects"] += len(matches)
-        scene_counts[scene_id] = {policy: empty_counts() for policy in POLICIES}
+        scene_counts[scene_id] = {policy: empty_counts() for policy in evaluation_policies}
 
         items_by_object: dict[int, list[dict[str, Any]]] = defaultdict(list)
         for item in gt_items:
@@ -541,11 +580,47 @@ def main() -> None:
             candidate_predictions = {
                 policy: collision[policy].tolist() for policy in POLICIES
             }
+            for label, root in single_depth_roots.items():
+                single_depth_events: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
+                for item in view_items:
+                    view_index = int(item["view_index"])
+                    event_path = (
+                        root
+                        / "events"
+                        / f"{scene_id}_prediction{gt_list_index}_view{view_index}.npz"
+                    )
+                    if not event_path.is_file():
+                        raise FileNotFoundError(
+                            f"Single-depth source {label} is missing {event_path}"
+                        )
+                    with np.load(event_path) as payload:
+                        single_depth_events.append(
+                            (
+                                payload["depths_m"],
+                                payload["valid_mask"],
+                                payload.get(
+                                    "transition_type",
+                                    np.zeros_like(payload["depths_m"], dtype=np.int8),
+                                ),
+                            )
+                        )
+                single_collision, _ = collision_predictions_batch(
+                    points_world,
+                    cameras,
+                    single_depth_events,
+                    args.surface_band_m,
+                )
+                candidate_predictions[f"{label}_fixed_conservative"] = single_collision[
+                    "gt_front_fixed_conservative"
+                ].tolist()
+                candidate_predictions[f"{label}_fixed_optimistic"] = single_collision[
+                    "gt_front_fixed_optimistic"
+                ].tolist()
             projected_views = counts["projected_point_views"].tolist()
             ground_truth_collision = candidate_predictions["gt_events_fixed_parity"]
             has_safe_candidate = any(not value for value in ground_truth_collision)
             per_policy_record: dict[str, Any] = {}
-            for policy in POLICIES:
+            for policy in evaluation_policies:
                 counts = empty_counts()
                 counts["objects"] = 1
                 counts["objects_with_safe_candidate"] = int(has_safe_candidate)
@@ -592,7 +667,7 @@ def main() -> None:
             )
 
     summarized: dict[str, Any] = {}
-    for policy in POLICIES:
+    for policy in evaluation_policies:
         summary = summarize_counts(totals[policy])
         summary["bootstrap_95_ci"] = {
             "collision_free_selection_rate_all_objects": bootstrap_ci(
@@ -624,10 +699,30 @@ def main() -> None:
 
     output = {
         "benchmark": "TablewareNet target-shell grasp-collision oracle",
-        "run_kind": "oracle_on_supplied_corrected_ground_truth_manifest",
+        "run_kind": (
+            "oracle_and_single_depth_models_on_supplied_corrected_ground_truth_manifest"
+            if single_depth_roots
+            else "oracle_on_supplied_corrected_ground_truth_manifest"
+        ),
         "scope": "offline collision gate only; no IK, furniture, other-object collision, execution, or robot task-success claim",
         "candidate_source": "cached T2SQNet GT-mask predicted objects + released primitive grasp planner with an audited pathological-sampling guard",
         "candidate_generation_reads_ground_truth": False,
+        "single_depth_collision_adapters_use_ground_truth": bool(single_depth_roots),
+        "single_depth_adapter_scope": (
+            "GT object identity/association and GT rendered first-surface visibility; "
+            "no back-side hypothesis is added"
+            if single_depth_roots
+            else None
+        ),
+        "single_depth_sources": {
+            label: {
+                "root": str(single_depth_roots[label]),
+                "method": metadata.get("method"),
+                "input_protocol": metadata.get("input_protocol"),
+                "adapter_oracles": metadata.get("adapter_oracles"),
+            }
+            for label, metadata in single_depth_metadata.items()
+        },
         "ground_truth_collision_definition": "odd parity of all corrected TablewareNet shell intersections, fused conservatively across seven views",
         "camera_image_size_contract": "TablewareNet [height, width]",
         "evaluation_denominator": {
@@ -638,6 +733,14 @@ def main() -> None:
         "unknown_space_policies": {
             "gt_front_fixed_conservative": "all space behind the first interface is occupied",
             "gt_front_fixed_optimistic": f"only a +/- {args.surface_band_m} m band around the first interface is occupied",
+        }
+        | {
+            f"{label}_fixed_conservative": "all space behind this model's visible single-depth event is occupied"
+            for label in single_depth_roots
+        }
+        | {
+            f"{label}_fixed_optimistic": f"only a +/- {args.surface_band_m} m band around this model's visible single-depth event is occupied"
+            for label in single_depth_roots
         },
         "frozen_planner": {
             "gripper_points": args.gripper_points,

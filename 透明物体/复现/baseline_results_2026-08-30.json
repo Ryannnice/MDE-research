@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "date": "2026-08-30",
   "units": {
     "depth": "metres unless a key ends in _mm",
@@ -11,41 +11,149 @@
     "oracle_diagnostic": "isolates representation or protocol capacity; not a deployable model result"
   },
   "p0": {
-    "booster_samples": 228,
+    "booster": {
+      "split": "train/balanced",
+      "samples": 228,
+      "archive_bytes": 19262416889,
+      "archive_entries": 2538,
+      "archive_sha256": "d7ffc44623f5279d9ff7435765399019bcf9054b505ec374742d82327415b50e",
+      "zip_crc_pass": true,
+      "required_assets_checked": 912,
+      "required_assets_missing": 0
+    },
     "midas_v21_base": {
       "origin": "native_reproduction",
-      "tom_rmse_mm": 140.40,
-      "paper_tom_rmse_mm": 140.31
+      "official_model_commit": "5de0f869d66edc48b79d2f9f197756e71b342f9a",
+      "checkpoint_sha256": "f6b980704cfd7259c7cc2b058c2f160159c55e84b3b6c08331b4156a84629f70",
+      "samples": 228,
+      "all_rmse_mm": 120.52857091970611,
+      "tom_rmse_mm": 140.40082721760933,
+      "other_rmse_mm": 119.8611859940646,
+      "tom_absrel": 0.11632891898935145,
+      "tom_delta1_05_percent": 36.299405031158386,
+      "paper_all_rmse_mm": 120.51,
+      "paper_tom_rmse_mm": 140.31,
+      "paper_other_rmse_mm": 119.86,
+      "native_metrics_sha256": "41f40bc101385aa37522bb4f6abf92def4acc88932986b502ca34014dbfe779d",
+      "independent_wrapper_sha256": "e02a97060c5939a85ea1d459b1c8a406f42673f0d3c7cc8880457764a3c8da0e",
+      "native_wrapper_crosscheck_pass": true
     },
     "dpt_large_base": {
       "origin": "native_reproduction",
-      "tom_rmse_mm": 136.28,
-      "paper_tom_rmse_mm": 136.28
+      "official_model_commit": "5de0f869d66edc48b79d2f9f197756e71b342f9a",
+      "checkpoint_sha256": "2f21e586477d90cb9624c7eef5df7891edca49a1c4795ee2cb631fd4daa6ca69",
+      "samples": 228,
+      "all_rmse_mm": 100.68365326680635,
+      "tom_rmse_mm": 136.27834879083835,
+      "other_rmse_mm": 95.62786075943394,
+      "tom_absrel": 0.10422027085293481,
+      "tom_delta1_05_percent": 37.69472385950897,
+      "paper_all_rmse_mm": 100.68,
+      "paper_tom_rmse_mm": 136.28,
+      "paper_other_rmse_mm": 95.63,
+      "native_metrics_sha256": "cbb464a948d997423b0fe65b6da7f7a4893baf38f0ece55efb30588a7b30d5bc",
+      "independent_wrapper_sha256": "40f78a53dd9326c88886d143234e75b47ae234610324f553117bafd07f15b65a",
+      "native_wrapper_crosscheck_pass": true
     },
     "layereddepth_validation": {
       "samples": 300,
-      "origin": "unified_benchmark",
+      "dataset_repo_commit": "5db6cefe76fd63f04517f9476a7c42b5d9ed486f",
+      "dataset_revision": "a2aad776030144950f8cbc2f12e2903b26316ff8",
+      "validation_bytes": 4313552685,
+      "tuple_denominators": {
+        "layer_first": {"pairs": 126504, "trips": 298815, "quads": 293790},
+        "layer_all": {"pairs": 256109, "trips": 610443, "quads": 599143},
+        "layer_all_mixed_quads": 195800
+      },
+      "single_depth_relative_inverse_protocol": "per-image positive scaling only: maximum valid inverse depth = 1; ordering unchanged",
       "dpt_base": {
-        "layer_first_quad_percent": 56.198,
-        "layer_all_quad_percent": 29.954
+        "origin": "unified_benchmark",
+        "layer_first": {
+          "pair_percent": 77.99911465250111,
+          "trip_percent": 61.88779010424510,
+          "quad_percent": 56.19830491167160
+        },
+        "layer_all": {
+          "pair_percent": 44.80045605581998,
+          "trip_percent": 32.75375424077269,
+          "quad_percent": 29.95428470331791,
+          "mixed_quad_correct": 0
+        },
+        "artifact_sha256": "95346890d6537ebea0875a51100cd4b826e097f4c989828ceedd49a80254eec3"
+      },
+      "midas_v21_base": {
+        "origin": "unified_benchmark",
+        "layer_first": {
+          "pair_percent": 81.54050464807437,
+          "trip_percent": 69.37871258136306,
+          "quad_percent": 66.16630926852514
+        },
+        "layer_all": {
+          "pair_percent": 46.58133841450320,
+          "trip_percent": 36.42059946628924,
+          "quad_percent": 34.84209946540308,
+          "mixed_quad_correct": 0
+        },
+        "artifact_sha256": "31bc512ec0a68b58462f5c19fb622e9c4cea80055d62e5f5fc430d799e002d0c"
       },
       "seegroup_release": {
-        "layer_first_quad_percent": 78.372,
-        "layer_all_quad_percent": 72.411
+        "origin": "native_reproduction",
+        "model_commit": "765cbe45f218553a146f8f887c09310c1e96998e",
+        "checkpoint_sha256": "c21ccdd1595fbf7bbf6045c5825314cae5d302ad95a9f862c1088bbc4d7b9c77",
+        "cache_npz": 300,
+        "cache_size_gb_approx": 41,
+        "layer_first": {
+          "pair_percent": 90.52520078416493,
+          "trip_percent": 82.28234861034419,
+          "quad_percent": 78.37196637053678
+        },
+        "layer_all": {
+          "pair_percent": 83.15873319563155,
+          "trip_percent": 75.68831160321274,
+          "quad_percent": 72.41393123177605,
+          "mixed_quad_correct": 130422,
+          "mixed_quad_percent": 66.60980592441267
+        },
+        "cache_manifest_sha256": "2d7876cf56163cac7bf7b1b2fdd427f6af83605cd19dea4fd35ad6d2c216e719",
+        "official_metrics_sha256": "2d0992ed3d19e0c6366f22d0f0ed36de806f8eb0175dec851fc5b9f204c8b06e",
+        "independent_wrapper_sha256": "ca4c4f64d1f4a09e415c965ebb93f5863893291a66a0bd87899b2b32603f710c",
+        "official_wrapper_total_metrics_exact": true
       },
-      "layer_all_gap_percentage_points": 42.457,
+      "strongest_single_depth_baseline": "MiDaS v2.1 Base",
+      "layer_all_gap_percentage_points": 37.57183176637297,
       "mixed_layer": {
         "tuples": 195800,
         "dpt_base_correct": 0,
-        "seegroup_correct": 130397,
-        "seegroup_percent": 66.597
+        "midas_v21_base_correct": 0,
+        "seegroup_correct": 130422,
+        "seegroup_percent": 66.60980592441267
       }
     },
     "seegroup_on_booster": {
       "origin": "oracle_diagnostic",
-      "raw_as_metric_tom_rmse_mm": 3372.31,
-      "affine_aligned_tom_rmse_mm": 65.54,
-      "raw_to_aligned_rmse_ratio": 51.46
+      "model_commit": "765cbe45f218553a146f8f887c09310c1e96998e",
+      "checkpoint_sha256": "c21ccdd1595fbf7bbf6045c5825314cae5d302ad95a9f862c1088bbc4d7b9c77",
+      "samples": 228,
+      "prediction_space": "raw_depth_head_units_not_metric_calibrated",
+      "prediction_manifest_sha256": "86e8dddffa2683d146e9e0fac8c98bc61dec022414ca056a664dda600585d6e5",
+      "raw_as_metric": {
+        "all_rmse_mm": 5759.176872387267,
+        "tom_rmse_mm": 3372.305374470163,
+        "other_rmse_mm": 5972.564491138123,
+        "tom_absrel": 3.782653082875495,
+        "tom_delta1_05_percent": 0.00017633261604755327,
+        "artifact_sha256": "9eca24c237a3afbc7240139aa8ca26f2b55cea20892fc0807726c92b68b10d4a"
+      },
+      "affine_aligned": {
+        "all_rmse_mm": 95.06030434056332,
+        "tom_rmse_mm": 65.53638988860111,
+        "other_rmse_mm": 98.45618478875411,
+        "tom_absrel": 0.06423011032289806,
+        "tom_delta1_05_percent": 44.23736943797009,
+        "artifact_sha256": "3a1152cc3c2d28c66a04d7f8f0af1d3e16f789f815a075e83e748d55b308a41f"
+      },
+      "raw_to_aligned_rmse_ratio": 51.456990234012196,
+      "scope": "raw-as-metric is a calibration stress test; affine-aligned is a cross-protocol bridge diagnostic, not a native SeeGroup metric-depth result"
     },
     "depth4tom_ft": {
       "status": "blocked_by_unpublished_checkpoint",
@@ -178,6 +286,86 @@
       "groundingdino_swinb_checkpoint_sha256": "46270f7a822e6906b655b729c90613e48929d0f2bb8b9b76fd10a856f3ac6ab7",
       "groundingdino_compatibility": "two PyTorch 2.8 scalar_type API substitutions; model semantics unchanged"
     },
+    "single_depth_same_benchmark": {
+      "origin": "unified_benchmark",
+      "adapter_scope": "GT object identity/association and GT rendered first-surface visibility; no back-side hypothesis",
+      "scenes": 98,
+      "objects": 259,
+      "object_view_event_maps": 1813,
+      "rendered_front_upper_bound": {
+        "valid_fraction_on_visible_pixels": 1.0,
+        "interface_precision": 1.0,
+        "interface_recall": 0.27473072289008804,
+        "interface_f1": 0.4310411884750287,
+        "matched_interface_mae_m": 0.0005447971771962465,
+        "artifact_sha256": "bbbd6538aed7d8d1593654abbb68a888e6e18f5f22d272678400a326a642118e"
+      },
+      "masked_raw_control": {
+        "valid_fraction_on_visible_pixels": 0.00010218168618360691,
+        "interface_precision": 1.0,
+        "interface_recall": 0.000028072448511350447,
+        "interface_f1": 0.00005614332094221449,
+        "artifact_sha256": "2080f6f328def5e94f446a0e920d67e8971aa405d4ad7df6fe111046d92d952c"
+      },
+      "dfnet_release_ood": {
+        "valid_fraction_on_visible_pixels": 0.6298071838727288,
+        "interface_precision": 0.0,
+        "interface_recall": 0.0,
+        "interface_f1": 0.0,
+        "artifact_sha256": "d807d96a8bf1050ac55f1cef20eff1d51bee16159659b598dcd35aa0717ed283"
+      },
+      "remake_release_ood": {
+        "valid_fraction_on_visible_pixels": 1.0,
+        "interface_precision": 0.001376951813117556,
+        "interface_recall": 0.00037829096700260357,
+        "interface_f1": 0.000593522945999037,
+        "matched_interface_mae_m": 0.002230916506710854,
+        "artifact_sha256": "8e7707a6ca28b97aaa141872a50e579e833ecfcc68e7149bfffcb9767544eee4"
+      },
+      "scope": "DFNet/ReMake use released checkpoints on OOD TablewareNet; low scores combine domain/calibration error with single-depth representation limits"
+    },
+    "fixed_planner_models": {
+      "origin": "unified_benchmark",
+      "scenes": 98,
+      "matched_objects": 244,
+      "candidates": 7983,
+      "dfnet_optimistic": {
+        "safe_selections": 223,
+        "selected_collisions": 21,
+        "rejected_objects": 0
+      },
+      "dfnet_conservative": {
+        "safe_selections": 139,
+        "selected_collisions": 0,
+        "rejected_objects": 105
+      },
+      "remake_optimistic": {
+        "safe_selections": 223,
+        "selected_collisions": 21,
+        "rejected_objects": 0
+      },
+      "remake_conservative": {
+        "safe_selections": 104,
+        "selected_collisions": 0,
+        "rejected_objects": 140
+      },
+      "rendered_front_optimistic": {
+        "safe_selections": 224,
+        "selected_collisions": 20,
+        "rejected_objects": 0
+      },
+      "rendered_front_conservative": {
+        "safe_selections": 240,
+        "selected_collisions": 0,
+        "rejected_objects": 4
+      },
+      "full_events": {
+        "safe_selections": 244,
+        "selected_collisions": 0,
+        "rejected_objects": 0
+      },
+      "artifact_sha256": "3ef195466dd9b20be17477df1fd037d08939eb651a6e357054b8032e44b5726c"
+    },
     "fixed_planner_oracle": {
       "origin": "oracle_diagnostic",
       "scenes": 98,
@@ -234,5 +422,13 @@
       "artifact_sha256": "eaa1bab3e81763129f2aa93aa8addc65c8a68ce52f862a124ea8dd3db85e1b9c",
       "scope": "offline target-shell collision gate; no IK, furniture, other-object collision, execution or robot task-success claim"
     }
+  },
+  "verification": {
+    "relevant_tests_passed": 32,
+    "formal_artifact_audit_pass": true,
+    "python_compile_pass": true,
+    "git_diff_check_pass": true,
+    "json_parse_pass": true,
+    "large_artifacts_committed_to_git": false
   }
 }

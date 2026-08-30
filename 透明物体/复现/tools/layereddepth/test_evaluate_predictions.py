@@ -62,6 +62,28 @@ class TupleEvaluationTest(unittest.TestCase):
         np.divide(1.0, inverse, out=depth, where=valid)
         np.testing.assert_allclose(depth, [[0.5, 0.25], [0.0, 0.0]])
 
+    def test_relative_inverse_depth_scale_preserves_order_and_validity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "prediction.npy"
+            np.save(path, np.array([[1000.0, 2000.0], [0.0, np.nan]], dtype=np.float32))
+            depth = MODULE.read_prediction(path, "relative_inverse_depth")
+        np.testing.assert_allclose(depth, [[2.0, 1.0], [0.0, 0.0]])
+        self.assertGreater(depth[0, 1], MODULE.MIN_DEPTH_M)
+
+    def test_relative_inverse_depth_rejects_multiple_layer_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            np.save(root / "4_1.npy", np.ones((2, 2), dtype=np.float32))
+            np.save(root / "4_3.npy", np.ones((2, 2), dtype=np.float32))
+            with self.assertRaisesRegex(ValueError, "single saved hypothesis"):
+                MODULE.load_layers(
+                    root,
+                    "4",
+                    (2, 2),
+                    "relative_inverse_depth",
+                    "odd",
+                )
+
     def test_depths_at_or_below_official_threshold_are_absent(self) -> None:
         layers = np.array([[[0.02]], [[0.03]]], dtype=np.float32)
         valid = np.ones_like(layers, dtype=bool)

@@ -26,12 +26,28 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional directory containing validation-*.parquet for offline input.",
     )
-    parser.add_argument("--max-samples", type=int, default=None)
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        help="Skip this many validation samples before caching a shard.",
+    )
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Maximum number of samples to process after --start-index.",
+    )
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Recompute samples whose NPZ cache already exists.",
+    )
+    parser.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="Do not load the model; require every requested NPZ to be reusable.",
     )
     return parser.parse_args()
 
@@ -47,6 +63,12 @@ def normalized_index(value, fallback: int) -> str:
 
 def main() -> None:
     args = parse_args()
+    if args.start_index < 0:
+        raise ValueError("--start-index must be non-negative")
+    if args.max_samples is not None and args.max_samples <= 0:
+        raise ValueError("--max-samples must be positive")
+    if args.cache_only and args.overwrite:
+        raise ValueError("--cache-only and --overwrite are mutually exclusive")
     official_root = args.official_root.expanduser().resolve()
     checkpoint_path = args.checkpoint_path.expanduser().resolve()
     output_dir = args.output_dir.expanduser().resolve()
@@ -75,15 +97,17 @@ def main() -> None:
     from util.config import get_config_from_path
     from util.train import to_cuda
 
-    config = get_config_from_path(
-        (official_root / "config" / "val.py").as_posix()
-    )
-    config["local_rank"] = 0
-    config["rank"] = 0
-    config["cli"] = "val"
-    config["resumed_from"] = checkpoint_path.as_posix()
-    model = init_model(config)
-    model.eval()
+    model = None
+    if not args.cache_only:
+        config = get_config_from_path(
+            (official_root / "config" / "val.py").as_posix()
+        )
+        config["local_rank"] = 0
+        config["rank"] = 0
+        config["cli"] = "val"
+        config["resumed_from"] = checkpoint_path.as_posix()
+        model = init_model(config)
+        model.eval()
 
     dataset_class = LayeredDepth
     if args.local_validation_dir is not None:
@@ -155,7 +179,12 @@ def main() -> None:
 
     with torch.no_grad():
         for batch_index, sample in enumerate(tqdm(loader, unit="sample")):
-            if args.max_samples is not None and batch_index >= args.max_samples:
+            if batch_index < args.start_index:
+                continue
+            if (
+                args.max_samples is not None
+                and batch_index >= args.start_index + args.max_samples
+            ):
                 break
             index = normalized_index(sample.get("index"), batch_index)
             destination = output_dir / f"{index}.npz"
@@ -194,6 +223,12 @@ def main() -> None:
                     )
                     continue
 
+            if args.cache_only:
+                raise FileNotFoundError(
+                    f"--cache-only requires a readable cache for validation sample {index}: "
+                    f"{destination}"
+                )
+            assert model is not None
             sample = to_cuda(sample)
             result = model_forward_unscale(model, {"image": sample["image"]})
 
@@ -252,6 +287,8 @@ def main() -> None:
                 ),
                 "split": "validation",
                 "subset": "layer_all",
+                "start_index": args.start_index,
+                "cache_only": args.cache_only,
                 "samples": len(manifest),
                 "metrics": metrics,
             },
@@ -266,6 +303,8 @@ def main() -> None:
             {
                 "method": "SeeGroup",
                 "checkpoint": checkpoint_path.as_posix(),
+                "start_index": args.start_index,
+                "cache_only": args.cache_only,
                 "samples": len(manifest),
                 "metrics": metrics_path.name,
                 "items": manifest,

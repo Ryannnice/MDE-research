@@ -11,7 +11,8 @@
 - Hugging Face dataset revision：`a2aad776030144950f8cbc2f12e2903b26316ff8`。
 - validation：300 张，dataset bytes `4,313,552,685`。
 - test：1,200 张，dataset bytes `15,151,980,964`。
-- P0 只用 validation；9 个 parquet 已缓存到 `透明物体/data/hf-cache/`，不下载 test。
+- P0 只用 validation；9 个 parquet 已固定到
+  `透明物体/data/layereddepth/repo/data/`，不下载 test。
 - 评测分为 `layer_first` 与 `layer_all`，tuple 类型为 pair/triplet/quadruplet。
 
 ## 当前状态
@@ -19,7 +20,7 @@
 - 官方代码已克隆到 `透明物体/external/layereddepth/official/`。
 - conda 环境 `layereddepth` 已建立。
 - 官方 `python evaluate.py --help` 已通过。
-- 项目 wrapper 的 7 个 synthetic/unit tests 已通过。
+- 项目 wrapper 的 9 个 synthetic/unit tests 已通过；本轮全部相关工具集中回归为 32 tests passed。
 - 已确认真实样本字段为 `__key__ / __url__ / image.png / tuples.json`，且 `tuples.json` 同时含 `layer_first` 与 `layer_all`。
 - `--subset both` 已在 8 个真实样本上与两次独立 subset 运行交叉核对，24 个 metric key 及全部 correct/total 逐项相同。
 - DPT-Large Base 与 SeeGroup released checkpoint 均已完成 300 张真实 validation。
@@ -49,7 +50,8 @@
 
 wrapper 明确：
 
-- `--npy-space depth|inverse_depth`；
+- `--npy-space depth|inverse_depth|relative_inverse_depth`；其中最后一种只做
+  保序的正比例归一化，供任意尺度的 MiDaS/DPT relative inverse depth 使用；
 - `--layer-naming odd|ordinal`；
 - `--prediction-format layer-files|seegroup-npz`；
 - `--subset both` 可在一次 cache 读取中同时累计 `layer_first` 与 `layer_all`；

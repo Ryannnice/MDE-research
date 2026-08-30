@@ -106,6 +106,89 @@ conda run -n transparent-baselines-gpu python \
   透明物体/复现/tools/shellbench/test_export_tablewarenet_shell_gt.py
 ```
 
+### Same-benchmark single-depth baselines
+
+The formal G0 comparison uses the 100-scene, four-object processed test split.
+`rendered_front` is a model-free visible-surface upper bound; `masked_raw` is
+the sensor-hole control. DFNet and ReMake use their released checkpoints and
+released preprocessing, but TablewareNet is out of distribution for both, so
+these are unified-benchmark diagnostics rather than native paper scores.
+
+```bash
+DATA=透明物体/data/tablewarenet/release/table_processed/table_object_num_4_processed/test
+
+conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/shellbench/run_tablewarenet_depth_baseline.py \
+  --method rendered_front --data-root "$DATA" \
+  --output-dir 透明物体/runs/shellbench/depth_rendered_front_tablewarenet_full
+
+conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/shellbench/run_tablewarenet_depth_baseline.py \
+  --method masked_raw --data-root "$DATA" \
+  --output-dir 透明物体/runs/shellbench/depth_masked_raw_tablewarenet_full
+
+CUDA_VISIBLE_DEVICES=0 conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/shellbench/run_tablewarenet_depth_baseline.py \
+  --method dfnet --data-root "$DATA" \
+  --official-root 透明物体/external/transcg/official \
+  --checkpoint-path 透明物体/weights/transcg/checkpoint.tar \
+  --output-dir 透明物体/runs/shellbench/depth_dfnet_tablewarenet_full
+
+CUDA_VISIBLE_DEVICES=1 conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/shellbench/run_tablewarenet_depth_baseline.py \
+  --method remake --data-root "$DATA" \
+  --official-root 透明物体/external/remake/official \
+  --checkpoint-path 透明物体/weights/remake/checkpoint.tar \
+  --relative-depth-weights \
+    透明物体/weights/depth-anything-v2/depth_anything_v2_vits.pth \
+  --output-dir 透明物体/runs/shellbench/depth_remake_tablewarenet_full
+```
+
+Adapt a completed axial-depth cache to the per-object ray-event contract. This
+adapter intentionally uses GT object association and GT visible-front support
+to isolate representation quality; it never synthesizes a back surface.
+
+```bash
+DATA=透明物体/data/tablewarenet/release/table_processed/table_object_num_4_processed/test
+
+conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/shellbench/adapt_tablewarenet_depth_baseline.py \
+  --data-root "$DATA" \
+  --ground-truth-root \
+    透明物体/runs/shellbench/tablewarenet_gt_per_object_hw_correct \
+  --prediction-root \
+    透明物体/runs/shellbench/depth_dfnet_tablewarenet_full \
+  --output-dir \
+    透明物体/runs/shellbench/events_dfnet_tablewarenet_full
+```
+
+Pass any number of completed adapters into the frozen-candidate collision
+gate with repeatable `--single-depth-root LABEL=DIR` arguments. The output
+keeps optimistic and conservative unknown-space policies separate.
+
+```bash
+DATA=透明物体/data/tablewarenet/release/table_processed/table_object_num_4_processed/test
+
+conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/shellbench/evaluate_grasp_collision_oracles.py \
+  --official-root 透明物体/external/t2sqnet/official \
+  --data-root "$DATA" \
+  --ground-truth-root \
+    透明物体/runs/shellbench/tablewarenet_gt_per_object_hw_correct \
+  --prediction-objects-root \
+    透明物体/runs/t2sqnet/gt_mask_test_hw_correct/objects \
+  --single-depth-root \
+    front=透明物体/runs/shellbench/events_rendered_front_tablewarenet_full \
+  --single-depth-root \
+    masked=透明物体/runs/shellbench/events_masked_raw_tablewarenet_full \
+  --single-depth-root \
+    dfnet=透明物体/runs/shellbench/events_dfnet_tablewarenet_full \
+  --single-depth-root \
+    remake=透明物体/runs/shellbench/events_remake_tablewarenet_full \
+  --output-json \
+    透明物体/runs/shellbench/grasp_collision_models_hw_correct.json
+```
+
 ## Scope and gate
 
 This contract covers ordered ray events, not arbitrary mesh voxelization or a

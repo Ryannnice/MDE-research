@@ -439,7 +439,13 @@ def summarize_statistics(stats: dict[str, float]) -> dict[str, float | None]:
     matched = stats["matched_events"]
     precision = matched / stats["pred_events"] if stats["pred_events"] else None
     recall = matched / stats["gt_events"] if stats["gt_events"] else None
-    f1 = None if precision is None or recall is None or precision + recall == 0 else 2 * precision * recall / (precision + recall)
+    f1 = (
+        None
+        if precision is None or recall is None
+        else 0.0
+        if precision + recall == 0
+        else 2 * precision * recall / (precision + recall)
+    )
     typed_precision = (
         stats["correct_typed_events"] / stats["pred_typed_events"]
         if stats["pred_typed_events"]
@@ -452,7 +458,9 @@ def summarize_statistics(stats: dict[str, float]) -> dict[str, float | None]:
     )
     typed_f1 = (
         None
-        if typed_precision is None or typed_recall is None or typed_precision + typed_recall == 0
+        if typed_precision is None or typed_recall is None
+        else 0.0
+        if typed_precision + typed_recall == 0
         else 2 * typed_precision * typed_recall / (typed_precision + typed_recall)
     )
     return {

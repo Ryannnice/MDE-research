@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run the released SeeGroup checkpoint on the Booster Table-2 image list.
 
-The saved prediction is the closest valid SeeGroup layer in metric metres.
-Directory structure follows each Booster RGB basename so the result can be
-evaluated against the official ``train_stereo.txt`` list without remapping.
+The saved prediction is the closest valid raw SeeGroup depth head. SeeGroup's
+training losses are normalization-aligned, so these values are not claimed to
+be calibrated metric metres. Directory structure follows each Booster RGB
+basename for explicit raw-as-metric and affine-aligned bridge diagnostics.
 """
 
 from __future__ import annotations
@@ -21,8 +22,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-root", type=Path, required=True)
     parser.add_argument("--dataset-txt", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--start-index", type=int, default=0)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="Do not load the model; require every requested NPY to be reusable.",
+    )
     return parser.parse_args()
 
 
@@ -43,6 +50,12 @@ def image_basenames(dataset_txt: Path) -> list[str]:
 
 def main() -> None:
     args = parse_args()
+    if args.start_index < 0:
+        raise ValueError("--start-index must be non-negative")
+    if args.max_samples is not None and args.max_samples <= 0:
+        raise ValueError("--max-samples must be positive")
+    if args.cache_only and args.overwrite:
+        raise ValueError("--cache-only and --overwrite are mutually exclusive")
     official_root = args.official_root.expanduser().resolve()
     checkpoint_path = args.checkpoint_path.expanduser().resolve()
     input_root = args.input_root.expanduser().resolve()
@@ -63,27 +76,31 @@ def main() -> None:
     from model import init_model
     from util.config import get_config_from_path
 
-    config = get_config_from_path((official_root / "config" / "val.py").as_posix())
-    config["local_rank"] = 0
-    config["rank"] = 0
-    config["cli"] = "val"
-    config["resumed_from"] = checkpoint_path.as_posix()
-    model = init_model(config)
-    model.eval()
+    model = None
+    if not args.cache_only:
+        config = get_config_from_path((official_root / "config" / "val.py").as_posix())
+        config["local_rank"] = 0
+        config["rank"] = 0
+        config["cli"] = "val"
+        config["resumed_from"] = checkpoint_path.as_posix()
+        model = init_model(config)
+        model.eval()
 
     basenames = image_basenames(dataset_txt)
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest = []
     mean = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
     std = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)
-    progress_total = len(basenames)
+    stop_index = len(basenames)
     if args.max_samples is not None:
-        progress_total = min(progress_total, args.max_samples)
-    basenames_to_process = basenames[:progress_total]
+        stop_index = min(stop_index, args.start_index + args.max_samples)
+    basenames_to_process = basenames[args.start_index:stop_index]
+    progress_total = len(basenames_to_process)
 
     with torch.inference_mode():
         for item, basename in enumerate(
-            tqdm(basenames_to_process, total=progress_total, unit="sample")
+            tqdm(basenames_to_process, total=progress_total, unit="sample"),
+            start=args.start_index,
         ):
             source = input_root / basename
             if not source.is_file():
@@ -104,6 +121,13 @@ def main() -> None:
                     }
                 )
                 continue
+
+            if args.cache_only:
+                raise FileNotFoundError(
+                    f"--cache-only requires a readable prediction for sample {item}: "
+                    f"{destination}"
+                )
+            assert model is not None
 
             image_bgr = cv2.imread(source.as_posix(), cv2.IMREAD_COLOR)
             if image_bgr is None:
@@ -156,7 +180,9 @@ def main() -> None:
             {
                 "method": "SeeGroup closest valid layer",
                 "checkpoint": checkpoint_path.as_posix(),
-                "prediction_space": "metric_depth_m",
+                "prediction_space": "raw_depth_head_units_not_metric_calibrated",
+                "start_index": args.start_index,
+                "cache_only": args.cache_only,
                 "samples": len(manifest),
                 "items": manifest,
             },

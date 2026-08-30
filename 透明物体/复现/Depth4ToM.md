@@ -31,6 +31,7 @@
 | DPT-Large Base | paper Table 2 | 100.68 mm | 136.28 mm | 95.63 mm | 37.70% |
 
 最大 RMSE 偏差为 0.09 mm，两个模型均通过预注册容差。原始结果位于 `透明物体/runs/depth4tom/table2_base/metrics/`，完整 stdout 位于同级 `logs/`；`runs/` 不入库。
+项目独立 `evaluate_booster.py` 又重算了两组 228 张预测；All/ToM/Other 的像素数、全部未四舍五入指标与官方 evaluator 一致，产物为同目录的 `midas_v21.json` 和 `dpt_large.json`。
 
 ## 官方脚本的真实协议
 
@@ -58,7 +59,10 @@
 - 官方 `requirements.txt` 的 `opencv==4.7.0` 不是标准 PyPI 包名；环境中改用 `opencv-python==4.7.0.72`。
 - 官方 PyTorch 1.13.1 + CUDA 11.6 不支持本机 RTX 5090；P0 使用 PyTorch 2.8.0 + CUDA 12.8，并保留旧依赖差异。
 - `run.run(...)` 内部读取全局 `args.it`，不是函数参数 `it`；直接 CLI 不受影响，作为库调用时需绕开。
-- 输出 `.npy` 是 relative inverse depth。进入 LayeredDepth 时必须显式使用 `--npy-space inverse_depth`。
+- 输出 `.npy` 是 relative inverse depth。进入 LayeredDepth 时必须显式使用
+  `--npy-space relative_inverse_depth`：wrapper 只把每张图的最大正 inverse
+  depth 缩放到 1，保持全部远近排序不变，同时避免 MiDaS/DPT 的任意输出
+  单位与 LayeredDepth 官方 `0.02 m` 有效阈值发生偶然耦合。
 
 ## LayeredDepth adapter
 
@@ -95,19 +99,23 @@ conda run -n depth4tom python \
   --output-dir 透明物体/runs/depth4tom/dpt_large_base/layereddepth \
   --cache-dir 透明物体/data/hf-cache \
   --local-validation-dir \
-    透明物体/data/hf-cache/hub/datasets--princeton-vl--LayeredDepth/snapshots/a2aad776030144950f8cbc2f12e2903b26316ff8/data
+    透明物体/data/layereddepth/repo/data
 ```
 
 该输出必须标为 `DPT-Large Base`，不能标为 `Depth4ToM`。
 
 300 张 validation 的本地完整结果：
 
-| Subset | Pair acc. | Triplet acc. | Quadruplet acc. |
-| --- | ---: | ---: | ---: |
-| `layer_first` | 77.999% | 61.888% | 56.198% |
-| `layer_all` | 44.800% | 32.754% | 29.954% |
+| Model | Subset | Pair acc. | Triplet acc. | Quadruplet acc. |
+| --- | --- | ---: | ---: | ---: |
+| DPT-Large Base | `layer_first` | 77.999% | 61.888% | 56.198% |
+| DPT-Large Base | `layer_all` | 44.800% | 32.754% | 29.954% |
+| MiDaS v2.1 Base | `layer_first` | 81.541% | 69.379% | 66.166% |
+| MiDaS v2.1 Base | `layer_all` | 46.581% | 36.421% | 34.842% |
 
-`layer_all` 的 mixed-layer tuple 为 0%，符合“只提供 layer 1、其余层明确 absent”的协议合同。原始 counts/metrics 保存在 `透明物体/runs/depth4tom/dpt_large_base/layereddepth_layer_{first,all}.json`。
+两个模型的 `layer_all` mixed-layer tuple 均为 0%，符合“只提供 layer 1、
+其余层明确 absent”的协议合同。正式结果分别保存在
+`runs/depth4tom/layereddepth_validation_base_{dpt,midas}/evaluation_both.json`。
 
 ## 微调权重阻塞解除后的命令
 

@@ -43,9 +43,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--npy-space",
-        choices=("depth", "inverse_depth"),
+        choices=("depth", "inverse_depth", "relative_inverse_depth"),
         default="depth",
-        help="Semantic space stored in NPY files. PNG files are depth in millimetres.",
+        help=(
+            "Semantic space stored in NPY files. 'relative_inverse_depth' "
+            "applies a positive per-image scale only, so arbitrary MiDaS/DPT "
+            "output units do not interact with LayeredDepth's 2 cm validity "
+            "threshold. PNG files are depth in millimetres."
+        ),
     )
     parser.add_argument(
         "--layer-naming",
@@ -102,8 +107,15 @@ def prediction_path(
 def read_prediction(path: Path, npy_space: str) -> np.ndarray:
     if path.suffix == ".npy":
         prediction = np.load(path).astype(np.float32, copy=False)
-        if npy_space == "inverse_depth":
+        if npy_space in {"inverse_depth", "relative_inverse_depth"}:
             valid = np.isfinite(prediction) & (prediction > 0)
+            if npy_space == "relative_inverse_depth" and np.any(valid):
+                # MiDaS/DPT base checkpoints emit relative inverse depth with
+                # model-dependent units.  A positive scale preserves every
+                # tuple ordering while keeping valid pixels above the official
+                # 2 cm metric-depth cutoff after inversion.
+                prediction = prediction.copy()
+                prediction[valid] /= float(prediction[valid].max())
             depth = np.zeros_like(prediction, dtype=np.float32)
             np.divide(1.0, prediction, out=depth, where=valid)
             prediction = depth
@@ -208,6 +220,12 @@ def load_layers(
             files.append(path.as_posix())
         layers.append(prediction)
         masks.append(prediction > 0)
+
+    if npy_space == "relative_inverse_depth" and sum(bool(path) for path in files) != 1:
+        raise ValueError(
+            "relative_inverse_depth is restricted to a single saved hypothesis; "
+            "independently scaling multiple layer files would change their cross-layer ordering"
+        )
 
     return np.stack(layers), np.stack(masks), files
 
@@ -403,6 +421,11 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "evaluated_subsets": list(subsets),
             "prediction_format": args.prediction_format,
             "npy_space": args.npy_space,
+            "relative_inverse_depth_normalization": (
+                "per-image positive scaling: maximum valid inverse depth = 1; ordering unchanged"
+                if args.npy_space == "relative_inverse_depth"
+                else None
+            ),
             "layer_naming": args.layer_naming,
             "missing_layer_semantics": "absent",
             "minimum_depth_m": MIN_DEPTH_M,

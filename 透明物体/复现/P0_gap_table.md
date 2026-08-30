@@ -8,10 +8,12 @@
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | --- |
 | Depth4ToM-DPT FT Virtual Depth | official Table 2 | 1 | `layer_first` | TBD | TBD | TBD | 300 | blocked: official weight URL 403 |
 | Depth4ToM-DPT FT Virtual Depth | official Table 2 | 1 + absent deeper layers | `layer_all` | TBD | TBD | TBD | 300 | blocked: official weight URL 403 |
+| MiDaS v2.1 Base | official Base weight | 1 | `layer_first` | 81.541% | 69.379% | 66.166% | 300 | local full run; relative-scale invariant protocol |
+| MiDaS v2.1 Base | official Base weight | 1 + absent deeper layers | `layer_all` | 46.581% | 36.421% | 34.842% | 300 | local full run; mixed-layer 0% |
 | DPT-Large Base | official MiDaS release | 1 | `layer_first` | 77.999% | 61.888% | 56.198% | 300 | local full run |
 | DPT-Large Base | official MiDaS release | 1 + absent deeper layers | `layer_all` | 44.800% | 32.754% | 29.954% | 300 | local full run |
 | SeeGroup | official release | up to 4 | `layer_first` | 90.525% | 82.282% | 78.372% | 300 | local full run |
-| SeeGroup | official release | up to 4 | `layer_all` | 83.161% | 75.687% | 72.411% | 300 | local full run; official-function equality verified |
+| SeeGroup | official release | up to 4 | `layer_all` | 83.159% | 75.688% | 72.414% | 300 | canonical 300-cache run; official-function equality verified |
 
 附加诊断必须保存各层与 `mixed` 的 correct/count，不能只填总 accuracy。
 
@@ -37,7 +39,10 @@
 
 ## 预注册诊断
 
-- `single-depth gap`：当前以 DPT-Large Base 的 `layer_all/quads/all` 作为 provisional 单层对照。它比 SeeGroup 低至少 5 个百分点记为强 gap；低 2–5 个百分点记为弱 gap；小于 2 个百分点不支持主张。该结果不能外推成已复现的 Depth4ToM-FT 结论。
+- `single-depth gap`：以 MiDaS/DPT Base 中较强的 `layer_all/quads/all`
+  作为单层对照，避免挑选较弱 baseline。它比 SeeGroup 低至少 5 个百分点
+  记为强 gap；低 2–5 个百分点记为弱 gap；小于 2 个百分点不支持主张。
+  该结果不能外推成已复现的 Depth4ToM-FT 结论。
 - `single-depth bridge gap`：SeeGroup raw-metric ToM RMSE 相比其 affine-aligned RMSE 的比值至少为 1.25，说明多层结构可用但不能直接回到 metric single-depth；比值不超过 1.10 则该桥接动机弱。
 - 上述阈值只作 P0 go/no-go，不写成统计显著性；正式实验仍需 bootstrap CI 或多 seed（若训练发生）。
 
@@ -45,4 +50,8 @@
 
 解释边界：SeeGroup 官方训练配置的 intensity/gradient losses 都使用 `alignment='normalization'`，因此 raw 行不是其原生 benchmark 主张，也不能写成“SeeGroup metric depth 失败”；它只衡量未经适配的输出直接进入 Booster 米制 readout 时的跨协议错位。
 
-当前 `single-depth gap = 72.411% - 29.954% = 42.457` 个百分点，通过强 gap 阈值。尤其是 mixed-layer quadruplet：DPT Base 为 `0/195800 = 0%`，SeeGroup 为 `130397/195800 = 66.597%`，直接暴露单一 front hypothesis 无法回答跨层 tuple；这仍是 Base fallback 证据，不能冒充 Depth4ToM-FT 证据。
+当前较强 single-depth 行是 MiDaS Base，因此预注册 gap 应写成
+`72.414% - 34.842% = 37.572` 个百分点，仍通过强 gap 阈值。MiDaS 与
+DPT 的 mixed-layer quadruplet 都是 `0/195800 = 0%`，而 SeeGroup 为
+`130422/195800 = 66.610%`，直接暴露单一 front hypothesis 无法回答跨层
+tuple；这仍是 Base fallback 证据，不能冒充 Depth4ToM-FT 证据。

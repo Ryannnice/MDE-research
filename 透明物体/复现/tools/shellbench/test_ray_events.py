@@ -58,6 +58,14 @@ class RayEventsTest(unittest.TestCase):
         self.assertAlmostEqual(metrics["interface_recall"], 2 / 3)
         self.assertAlmostEqual(metrics["matched_interface_mae_m"], 0.0)
 
+    def test_zero_overlap_reports_zero_f1(self) -> None:
+        gt = single_depth_events(np.asarray([[0.2]], dtype=np.float32))
+        pred = single_depth_events(np.asarray([[0.8]], dtype=np.float32))
+        metrics = summarize_statistics(event_statistics(pred, gt, 0.01))
+        self.assertEqual(metrics["interface_precision"], 0.0)
+        self.assertEqual(metrics["interface_recall"], 0.0)
+        self.assertEqual(metrics["interface_f1"], 0.0)
+
     def test_topology_metrics_require_explicit_types(self) -> None:
         valid = np.ones((4, 1, 1), dtype=bool)
         depths = np.asarray([[[0.2]], [[0.3]], [[0.6]], [[0.7]]], dtype=np.float32)
