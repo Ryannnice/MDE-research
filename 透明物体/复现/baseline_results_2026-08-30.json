@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-30",
+  "units": {
+    "depth": "metres unless a key ends in _mm",
+    "rates": "fractions in [0,1] unless a key ends in _percent or _percentage_points"
+  },
+  "result_origin_contract": {
+    "native_reproduction": "official data, released checkpoint and native evaluator",
+    "unified_benchmark": "local common protocol; not a number from the source paper",
+    "oracle_diagnostic": "isolates representation or protocol capacity; not a deployable model result"
+  },
+  "p0": {
+    "booster_samples": 228,
+    "midas_v21_base": {
+      "origin": "native_reproduction",
+      "tom_rmse_mm": 140.40,
+      "paper_tom_rmse_mm": 140.31
+    },
+    "dpt_large_base": {
+      "origin": "native_reproduction",
+      "tom_rmse_mm": 136.28,
+      "paper_tom_rmse_mm": 136.28
+    },
+    "layereddepth_validation": {
+      "samples": 300,
+      "origin": "unified_benchmark",
+      "dpt_base": {
+        "layer_first_quad_percent": 56.198,
+        "layer_all_quad_percent": 29.954
+      },
+      "seegroup_release": {
+        "layer_first_quad_percent": 78.372,
+        "layer_all_quad_percent": 72.411
+      },
+      "layer_all_gap_percentage_points": 42.457,
+      "mixed_layer": {
+        "tuples": 195800,
+        "dpt_base_correct": 0,
+        "seegroup_correct": 130397,
+        "seegroup_percent": 66.597
+      }
+    },
+    "seegroup_on_booster": {
+      "origin": "oracle_diagnostic",
+      "raw_as_metric_tom_rmse_mm": 3372.31,
+      "affine_aligned_tom_rmse_mm": 65.54,
+      "raw_to_aligned_rmse_ratio": 51.46
+    },
+    "depth4tom_ft": {
+      "status": "blocked_by_unpublished_checkpoint",
+      "claim_allowed": false
+    }
+  },
+  "transcg": {
+    "split": "official test",
+    "scenes": 52,
+    "samples": 23524,
+    "dfnet_current_release": {
+      "origin": "native_reproduction",
+      "paper_checkpoint_equivalent": false,
+      "official_commit": "135f9e0ad20592cb40b288c152aff5eda033a765",
+      "checkpoint_sha256": "7d706a0b3ecf94e086e46abc9e640858790bb680f8994ad6c564f7e9c4ad83fe",
+      "all": {
+        "rmse_m": 0.018456,
+        "rel": 0.020245,
+        "mae_m": 0.009905,
+        "delta_1_05_percent": 89.876688,
+        "delta_1_10_percent": 95.286890,
+        "delta_1_25_percent": 99.292695
+      },
+      "transparent_mask": {
+        "rmse_m": 0.032787,
+        "rel": 0.057680,
+        "mae_m": 0.025963,
+        "delta_1_05_percent": 63.256212,
+        "delta_1_10_percent": 80.467048,
+        "delta_1_25_percent": 97.713692
+      },
+      "identity_input_same_protocol": {
+        "all_rmse_m": 0.02011630469889898,
+        "transparent_mask_rmse_m": 0.045293300008585974,
+        "transparent_mask_rel": 0.07689006095149746,
+        "transparent_mask_delta_1_05_percent": 52.11901445080483
+      },
+      "cache_native_crosscheck": {
+        "pass": true,
+        "rmse_absolute_difference_m": 0.000002955953244141855,
+        "max_threshold_difference_percentage_points": 0.003013584854178352
+      }
+    },
+    "remake_global_loss": {
+      "origin": "native_reproduction",
+      "paper_table_i_reproduced_at_reported_precision": true,
+      "official_commit": "4f568148c8421544136bf49bb941149e0c990a34",
+      "checkpoint_sha256": "2e84c0474f9c6314aa910a507228dbe4dd3972e8d840dfab0c8deb32e2973d82",
+      "depth_anything_v2_vits_sha256": "715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378",
+      "all": {
+        "rmse_m": 0.008391948179049676,
+        "rel": 0.007345035680541362,
+        "mae_m": 0.004617953276725844,
+        "delta_1_05_percent": 98.67119657062912
+      },
+      "transparent_mask": {
+        "rmse_m": 0.010854020135870238,
+        "rel": 0.01690637328443598,
+        "mae_m": 0.007532024340969497,
+        "delta_1_01_percent": 47.34046378041019,
+        "delta_1_03_percent": 85.11362990703009,
+        "delta_1_05_percent": 93.90863514112749,
+        "delta_1_10_percent": 98.67071313449384,
+        "delta_1_25_percent": 99.9714193376954
+      },
+      "paper_table_i_transparent_mask": {
+        "rmse_m": 0.011,
+        "rel": 0.017,
+        "mae_m": 0.008,
+        "delta_1_01_percent": 47.35,
+        "delta_1_03_percent": 85.12,
+        "delta_1_05_percent": 93.91,
+        "delta_1_10_percent": 98.67,
+        "delta_1_25_percent": 99.97
+      },
+      "identity_input_same_protocol": {
+        "all_rmse_m": 0.07400922375434876,
+        "transparent_mask_rmse_m": 0.16702595987775115,
+        "transparent_mask_rel": 0.23519686855283284,
+        "transparent_mask_delta_1_05_percent": 43.823343751291056
+      },
+      "cache_native_crosscheck": {
+        "pass": true,
+        "max_absolute_difference": 0.004349219589812492,
+        "max_difference_unit": "percentage_points"
+      }
+    }
+  },
+  "shellbench": {
+    "origin": "unified_benchmark",
+    "camera_image_size_contract": "TablewareNet [height,width] = [240,320]",
+    "ground_truth": {
+      "dataset_scenes": 100,
+      "hollow_scored_scenes": 98,
+      "rgb_views": 700,
+      "hollow_objects": 259,
+      "object_view_event_maps": 1813,
+      "rays": 139238400,
+      "scope": "TablewareNet model-induced physical-shell oracle; not measured real-wall ground truth"
+    },
+    "t2sqnet_gt_mask": {
+      "input_protocol": "official GT masks; LangSAM bypassed",
+      "predicted_objects": 386,
+      "matched_objects": 244,
+      "object_precision": 0.6321243523316062,
+      "object_recall": 0.9420849420849421,
+      "interface_f1": 0.79230856924327,
+      "transition_f1": 0.7359150509624517,
+      "matched_interface_mae_m": 0.0018410516706807074
+    },
+    "t2sqnet_rgb_langsam": {
+      "input_protocol": "RGB; upstream LangSAM rgb2mask unchanged",
+      "predicted_objects": 394,
+      "matched_objects": 238,
+      "object_precision": 0.6040609137055838,
+      "object_recall": 0.918918918918919,
+      "mask_micro_iou": 0.9526591721797142,
+      "mask_micro_f1": 0.9757557138005604,
+      "interface_f1": 0.7427009085815202,
+      "transition_f1": 0.691353283305975,
+      "matched_interface_mae_m": 0.001892047721631487
+    },
+    "t2sqnet_provenance": {
+      "t2sqnet_commit": "7e85fc65e18af5c6a0946f7fd82af7425277fea7",
+      "langsam_commit": "05c386ee95b26a8ec8398bebddf70ffb8ddd3faf",
+      "groundingdino_commit": "5a890bd867ab0eacb851046c7f5a55cab0e77925",
+      "t2sqnet_bbox_checkpoint_sha256": "174fb68a6f6bdae9f7a203a94c48e6332fbeffd343da504ddda53b13a23669da",
+      "t2sqnet_pretrained_archive_sha256": "91e9fea04327b124961c00cabbb97cc1e10e81af171de598aa2a1426abc9eb7a",
+      "sam_vit_h_checkpoint_sha256": "a7bf3b02f3ebf1267aba913ff637d9a2d5c33d3173bb679e46d9f338c26f262e",
+      "groundingdino_swinb_checkpoint_sha256": "46270f7a822e6906b655b729c90613e48929d0f2bb8b9b76fd10a856f3ac6ab7",
+      "groundingdino_compatibility": "two PyTorch 2.8 scalar_type API substitutions; model semantics unchanged"
+    },
+    "fixed_planner_oracle": {
+      "origin": "oracle_diagnostic",
+      "scenes": 98,
+      "matched_objects": 244,
+      "candidates": 7983,
+      "bootstrap_unit": "scene",
+      "bootstrap_replicates": 2000,
+      "front_conservative": {
+        "safe_selections": 240,
+        "selected_collisions": 0,
+        "rejected_objects": 4,
+        "collision_free_selection_rate": 0.9836065573770492,
+        "bootstrap_95_ci": [0.9673469387755103, 0.9960474308300395]
+      },
+      "front_optimistic": {
+        "safe_selections": 224,
+        "selected_collisions": 20,
+        "rejected_objects": 0,
+        "collision_free_selection_rate": 0.9180327868852459,
+        "bootstrap_95_ci": [0.8851063829787233, 0.9489415795167688],
+        "candidate_collision_recall": 0.05075187969924812,
+        "candidate_through_wall_false_negative_rate": 0.9492481203007519
+      },
+      "full_events_parity": {
+        "safe_selections": 244,
+        "selected_collisions": 0,
+        "rejected_objects": 0,
+        "collision_free_selection_rate": 1.0,
+        "bootstrap_95_ci": [1.0, 1.0]
+      },
+      "full_events_shell_aware": {
+        "safe_selections": 244,
+        "selected_collisions": 0,
+        "rejected_objects": 0,
+        "collision_free_selection_rate": 1.0,
+        "bootstrap_95_ci": [1.0, 1.0]
+      },
+      "optimistic_to_full_gap_percentage_points": 8.19672131147541,
+      "dish_slice": {
+        "objects": 29,
+        "front_optimistic_safe_selections": 9,
+        "front_optimistic_selected_collisions": 20,
+        "full_events_safe_selections": 29,
+        "full_events_selected_collisions": 0
+      },
+      "candidate_sampler_guard": {
+        "normal_upstream_sampling_preserved": true,
+        "fallback_calls": 1,
+        "fallback_object": "scene 268, GT object 1, Bowl",
+        "max_steps_per_direction": 4096,
+        "fallback_grid_samples": 8192,
+        "fallback_return_samples": 72
+      },
+      "artifact_sha256": "eaa1bab3e81763129f2aa93aa8addc65c8a68ce52f862a124ea8dd3db85e1b9c",
+      "scope": "offline target-shell collision gate; no IK, furniture, other-object collision, execution or robot task-success claim"
+    }
+  }
+}

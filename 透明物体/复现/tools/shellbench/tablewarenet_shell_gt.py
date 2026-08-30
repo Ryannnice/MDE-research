@@ -71,7 +71,9 @@ def build_hollow_meshes(data: dict[str, Any], object_index: int | None) -> tuple
 def rays_from_camera(camera: dict[str, Any]) -> tuple[np.ndarray, tuple[int, int]]:
     intrinsics = as_numpy(camera["camera_intr"]).astype(np.float64)
     pose = as_numpy(camera["camera_pose"]).astype(np.float64)
-    width, height = [int(value) for value in as_numpy(camera["camera_image_size"]).reshape(-1)[:2]]
+    # TablewareNet stores image size as [height, width], matching mask/rgb
+    # tensor shapes and the upstream tablewarenet utilities.
+    height, width = [int(value) for value in as_numpy(camera["camera_image_size"]).reshape(-1)[:2]]
     col, row = np.meshgrid(np.arange(width, dtype=np.float64), np.arange(height, dtype=np.float64))
     directions_camera = np.stack(
         ((col - intrinsics[0, 2]) / intrinsics[0, 0], (row - intrinsics[1, 2]) / intrinsics[1, 1], np.ones_like(row)),

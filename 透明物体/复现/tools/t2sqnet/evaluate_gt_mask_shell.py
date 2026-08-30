@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Evaluate released T²SQNet GT-mask predictions against TablewareNet shells.
+"""Evaluate released T²SQNet predictions against TablewareNet shells.
 
 This reader compares *per-object* ray-event files.  It first matches released
 T²SQNet objects to known TablewareNet objects by semantic class and predicted
 centre distance, then charges unmatched GT objects as empty predictions.  The
-result is intentionally labelled GT-mask diagnostic: it evaluates T²SQNet's
-released recognition/shape models, not its RGB-to-mask stage.
+The prediction run's own ``metrics.json`` supplies the method and input
+protocol labels, so the same geometry evaluator cannot accidentally report an
+RGB run as the separate GT-mask oracle.
 """
 
 from __future__ import annotations
@@ -125,6 +126,10 @@ def main() -> None:
     prediction_manifest = load_json(prediction_root / "manifest.json")
     if not isinstance(prediction_manifest, list):
         raise ValueError("prediction manifest must be the T²SQNet runner list")
+    prediction_run_path = prediction_root / "metrics.json"
+    prediction_run = load_json(prediction_run_path) if prediction_run_path.is_file() else {}
+    method = str(prediction_run.get("method", "T2SQNet_released_models_with_official_GT_masks"))
+    input_protocol = str(prediction_run.get("input_protocol", "GT mask; LangSAM segmentation bypassed"))
     sys.path.insert(0, str(SHELLBENCH_DIR))
     from ray_events import RayEvents, add_statistics, empty_statistics, event_statistics, summarize_statistics
 
@@ -208,8 +213,9 @@ def main() -> None:
     precision = totals["matched_objects"] / totals["predicted_objects"] if totals["predicted_objects"] else None
     recall = totals["matched_objects"] / totals["gt_objects"] if totals["gt_objects"] else None
     payload = {
-        "method": "T2SQNet_released_models_with_official_GT_masks",
-        "input_protocol": "GT mask; LangSAM segmentation bypassed",
+        "method": method,
+        "input_protocol": input_protocol,
+        "prediction_run_metadata": prediction_run,
         "ground_truth_scope": "TablewareNet model-induced physical-shell oracle; not measured real-wall GT",
         "ground_truth_root": str(gt_root),
         "prediction_root": str(prediction_root),

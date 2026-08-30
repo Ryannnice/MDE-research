@@ -16,8 +16,9 @@ The script loads:
 This minimal run uses synthetic relative depth, so it verifies the ReMake core
 network and checkpoint but is not an official benchmark reproduction.
 
-Full TransCG reproduction (after the TransCG audit passes) uses the released
-ReMake checkpoint and released Depth Anything V2-vits weights.  The Python
+Full TransCG reproduction uses the released ReMake checkpoint and released
+Depth Anything V2-vits weights. The 23,524-sample audit and both full execution
+paths have completed. The Python
 adapter preserves the upstream dataset/preprocessing/metrics and additionally
 caches one metric-depth map per frame for ShellBench:
 
@@ -28,10 +29,12 @@ CUDA_VISIBLE_DEVICES=0 conda run -n transparent-baselines-gpu python \
   --dataset-root 透明物体/data/transcg/transcg \
   --checkpoint-path 透明物体/weights/remake/checkpoint.tar \
   --relative-depth-weights 透明物体/weights/depth-anything-v2/depth_anything_v2_vits.pth \
-  --output-dir 透明物体/runs/remake/release_test
+  --output-dir 透明物体/runs/remake/release_test --resume
 ```
 
 `run_remake_native_full.sh` is an independent, unmodified-upstream test-path
-cross-check.  Neither entrypoint will label a partial data run as full.
+cross-check. Neither entrypoint will label a partial data run as full.
+`../transcg/evaluate_input_depth_full.py --protocol remake` produces the
+identity-input control under ReMake's own 640×480 preprocessing.
 
 See `透明物体/复现/ReMake.md` for the full record.

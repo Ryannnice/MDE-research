@@ -1,43 +1,37 @@
-# 透明物体复现入口
+# 透明物体 baseline 复现入口
 
-## 当前项目关系
+当前主线是 [Shell-Aware Multi-Layer Transparent Grasping](../Shell-Aware-Multi-Layer-Transparent-Grasping-Idea-v2.md)。最新、最易读的状态与数字统一见：
 
-总项目主线已统一为 [Shell-Aware Multi-Layer Transparent Grasping](../Shell-Aware-Multi-Layer-Transparent-Grasping-Idea-v2.md)，实验总控见 [统一实验设计](../Shell-Aware-Multi-Layer-Transparent-Grasping-Experiment-v1.md)。
+- [复现进度总览（2026-08-30）](复现进度总览_2026-08-30.md)
+- [G0 执行总控](G0_执行总控.md)
+- [P0 单层/多层 gap table](P0_gap_table.md)
 
-本目录原有的 DepthHypothesisPack P0 现在是**支撑感知线**：它验证单层 / 多层透明深度协议并提供 LayeredDepth、SeeGroup、Depth4ToM 工具资产，但不再单独定义总项目的 idea。
+## 当前结论
 
-想快速了解所有 baseline 的完成度、结果边界和下一步，请先读
-[`复现进度总览_2026-07-27.md`](复现进度总览_2026-07-27.md)。
+截至 2026-08-30：
 
-当前主项目的 G0 是：
+- TransCG official test 已完整下载并审计：52 scenes，23,524 samples；不再受 Google Drive 配额阻塞。
+- ReMake 已按原生入口跑完 23,524 张，masked 指标在论文 Table I 报告精度内一致。
+- DFNet 已跑完当前官方 release 的原生全量评测；官方明确说明当前 checkpoint 不同于论文原 checkpoint，因此不能宣称逐项复现论文旧表。
+- T²SQNet 已完成 100-scene `GT-mask` 与完整 RGB/LangSAM inference；ShellBench 在其中 98 个含 hollow GT 的 scene 上评分，不能冒充 T²SQNet 论文表格指标。
+- fixed-planner 表示 oracle 已完成：同一 7,983 个候选上，front optimistic 的 safe selection 为 224/244，full events 为 244/244；表示层 G0 gate `PASS`。
+- Depth4ToM 的公开 Base 路径已复现；FT checkpoint 未公开可用，Base 结果不得改名为 FT。
+- LayeredDepth / SeeGroup 的 P0 gap 已成立：DPT Base 与 SeeGroup 的 `layer_all` quad 相差 42.457 个百分点。
 
-```text
-GT / mesh 薄壳可行性审计
-→ ReMake / T²SQNet / Trans2Occ 等表示的 shell-failure diagnostic
-→ 几何错误与固定 planner 失败的对应关系
-→ go / no-go
-```
+## 结果应该放在哪张表
 
-## 支撑感知线：DepthHypothesisPack P0
+| 表 | 可放方法 | 不应混入 |
+| --- | --- | --- |
+| TransCG metric depth completion | DFNet current release、ReMake、raw input depth | T²SQNet ShellBench、SeeGroup cross-protocol 读数 |
+| LayeredDepth multi-layer | DPT Base、SeeGroup | Booster ToM RMSE |
+| ShellBench multi-interface | T²SQNet RGB、T²SQNet GT-mask oracle、后续 Head | TransCG 论文指标 |
+| fixed-planner collision diagnostic | front/events oracles、后续各方法 event readout | 机器人 task success 声明 |
 
-- 总控与验收：[`P0_三件套.md`](P0_三件套.md)
-- 预注册 gap table：[`P0_gap_table.md`](P0_gap_table.md)
-- 单项记录：[`Depth4ToM.md`](Depth4ToM.md)、[`LayeredDepth.md`](LayeredDepth.md)、[`SeeGroup.md`](SeeGroup.md)
-- 环境：[`environments/`](environments/)
-- 跨协议工具：[`tools/depth4tom/`](tools/depth4tom/)、[`tools/layereddepth/`](tools/layereddepth/)、[`tools/seegroup/`](tools/seegroup/)
+## 目录导航
 
-该支线的顺序仍为：官方基线复现 → 两个 gap diagnostics → 支撑线 go/no-go。主项目 G0 之前不实现新的完整 shell head。
+- P0 支撑线：[P0_三件套.md](P0_三件套.md)、[Depth4ToM.md](Depth4ToM.md)、[LayeredDepth.md](LayeredDepth.md)、[SeeGroup.md](SeeGroup.md)
+- TransCG baselines：[TransCG_DFNet.md](TransCG_DFNet.md)、[ReMake.md](ReMake.md)
+- 工具入口：[tools/transcg](tools/transcg)、[tools/remake](tools/remake)、[tools/t2sqnet](tools/t2sqnet)、[tools/shellbench](tools/shellbench)
+- 2026-07-27 的旧总览保留为历史快照：[复现进度总览_2026-07-27.md](复现进度总览_2026-07-27.md)
 
-2026-07-19 状态：公开 Base 路线已完成全量复现；支撑线 `G1 strong PASS`。Depth4ToM FT 权重仍是明确的上游 artifact blocker，Base 结果不得改名为 FT 结果。总项目仍受 shell GT / grasp-failure 主 G0 约束。
-
-## 当前 shell G0 的 baseline 资产与状态
-
-- [`TransCG_DFNet.md`](TransCG_DFNet.md)
-- [`ReMake.md`](ReMake.md)
-- [`G0_执行总控.md`](G0_执行总控.md)：当前全量 baseline、shell GT 与 planner gate 的可执行总控
-
-注意：
-
-- TransCG / ReMake 的 released checkpoint、GPU environment、完整 test runner、原生 cross-check wrapper 与 per-frame cache 已就绪；但官方 Google Drive 当前对 TransCG 第 2–13 分块返回 quota exceeded，尚未得到完整真实 baseline 结果；
-- TablewareNet physical-shell batch oracle 与 T²SQNet released-model GT-mask 100-scene full run 已完成；它是 GT-mask oracle，RGB segmentation 仍待做且必须分行报告；
-- 以上记录不能写成已证明 single-depth 会导致实心化，也不能写成机器人提升。
+权重、数据集和逐帧预测均由 `.gitignore` 排除；Git 只保存代码、协议、汇总结果和审计信息。

@@ -14,6 +14,11 @@ from typing import Iterable
 
 import numpy as np
 
+try:
+    from numba import njit
+except ImportError:  # pragma: no cover - the portable Python evaluator remains available
+    njit = None
+
 
 SCHEMA_VERSION = 1
 UNKNOWN = 0
@@ -216,15 +221,9 @@ def add_statistics(target: dict[str, float], source: dict[str, float]) -> None:
         target[key] = target.get(key, 0) + value
 
 
-def event_statistics(prediction: RayEvents, ground_truth: RayEvents, delta_m: float) -> dict[str, float]:
-    """Return additive event-matching statistics for one frame."""
+def _event_statistics_python(pred: RayEvents, gt: RayEvents, delta_m: float) -> dict[str, float]:
+    """Portable reference implementation for an already-normalized pair."""
 
-    if delta_m <= 0:
-        raise ValueError("delta_m must be positive")
-    pred = prediction.normalized()
-    gt = ground_truth.normalized()
-    if pred.shape[1:] != gt.shape[1:]:
-        raise ValueError(f"Image shapes differ: {pred.shape[1:]} vs {gt.shape[1:]}")
     stats = empty_statistics()
     _, height, width = gt.shape
     for row in range(height):
@@ -257,6 +256,183 @@ def event_statistics(prediction: RayEvents, ground_truth: RayEvents, delta_m: fl
                 stats["topology_labeled_rays"] += 1
                 stats["topology_valid_rays"] += int(_topology_valid(p_type))
     return stats
+
+
+if njit is not None:
+
+    @njit(cache=True)
+    def _event_statistics_kernel(
+        pred_depths: np.ndarray,
+        pred_valid: np.ndarray,
+        pred_types: np.ndarray,
+        gt_depths: np.ndarray,
+        gt_valid: np.ndarray,
+        gt_types: np.ndarray,
+        delta_m: float,
+    ) -> np.ndarray:
+        """Numba equivalent of the order-constrained per-ray reference loop."""
+
+        pred_layers, height, width = pred_depths.shape
+        gt_layers = gt_depths.shape[0]
+        result = np.zeros(13, dtype=np.float64)
+        matches = np.zeros((pred_layers + 1, gt_layers + 1), dtype=np.int16)
+        costs = np.zeros((pred_layers + 1, gt_layers + 1), dtype=np.float64)
+        choice = np.zeros((pred_layers + 1, gt_layers + 1), dtype=np.int8)
+        for image_row in range(height):
+            for image_col in range(width):
+                pred_count = 0
+                gt_count = 0
+                pred_typed = 0
+                gt_typed = 0
+                for layer in range(pred_layers):
+                    if pred_valid[layer, image_row, image_col]:
+                        pred_count += 1
+                        if pred_types[layer, image_row, image_col] != UNKNOWN:
+                            pred_typed += 1
+                for layer in range(gt_layers):
+                    if gt_valid[layer, image_row, image_col]:
+                        gt_count += 1
+                        if gt_types[layer, image_row, image_col] != UNKNOWN:
+                            gt_typed += 1
+
+                result[0] += 1
+                if pred_count == gt_count:
+                    result[1] += 1
+                result[2] += pred_count
+                result[3] += gt_count
+                result[7] += pred_typed
+                result[8] += gt_typed
+
+                for row in range(pred_count + 1):
+                    for col in range(gt_count + 1):
+                        matches[row, col] = 0
+                        costs[row, col] = 0.0
+                        choice[row, col] = 0
+                for row in range(1, pred_count + 1):
+                    for col in range(1, gt_count + 1):
+                        best_matches = matches[row - 1, col]
+                        best_cost = costs[row - 1, col]
+                        best_choice = 1
+
+                        candidate_matches = matches[row, col - 1]
+                        candidate_cost = costs[row, col - 1]
+                        if candidate_matches > best_matches or (
+                            candidate_matches == best_matches and candidate_cost < best_cost
+                        ):
+                            best_matches = candidate_matches
+                            best_cost = candidate_cost
+                            best_choice = 2
+
+                        error = abs(
+                            np.float64(
+                                pred_depths[row - 1, image_row, image_col]
+                                - gt_depths[col - 1, image_row, image_col]
+                            )
+                        )
+                        if error <= delta_m:
+                            candidate_matches = matches[row - 1, col - 1] + 1
+                            candidate_cost = costs[row - 1, col - 1] + error
+                            if candidate_matches > best_matches or (
+                                candidate_matches == best_matches and candidate_cost < best_cost
+                            ):
+                                best_matches = candidate_matches
+                                best_cost = candidate_cost
+                                best_choice = 3
+                        matches[row, col] = best_matches
+                        costs[row, col] = best_cost
+                        choice[row, col] = best_choice
+
+                row = pred_count
+                col = gt_count
+                while row > 0 and col > 0:
+                    step = choice[row, col]
+                    if step == 3:
+                        pred_type = pred_types[row - 1, image_row, image_col]
+                        gt_type = gt_types[col - 1, image_row, image_col]
+                        error = abs(
+                            np.float64(
+                                pred_depths[row - 1, image_row, image_col]
+                                - gt_depths[col - 1, image_row, image_col]
+                            )
+                        )
+                        result[4] += 1
+                        result[5] += error
+                        result[6] += error * error
+                        if pred_type != UNKNOWN and gt_type != UNKNOWN:
+                            result[9] += 1
+                            if pred_type == gt_type:
+                                result[10] += 1
+                        row -= 1
+                        col -= 1
+                    elif step == 1:
+                        row -= 1
+                    else:
+                        col -= 1
+
+                if pred_count > 0 and pred_typed == pred_count:
+                    result[11] += 1
+                    state = 0  # 0=air, 1=shell, 2=cavity, 3=invalid
+                    for layer in range(pred_count):
+                        transition = pred_types[layer, image_row, image_col]
+                        if transition == AIR_TO_SHELL and state == 0:
+                            state = 1
+                        elif transition == SHELL_TO_CAVITY and state == 1:
+                            state = 2
+                        elif transition == CAVITY_TO_SHELL and state == 2:
+                            state = 1
+                        elif transition == SHELL_TO_AIR and state == 1:
+                            state = 0
+                        else:
+                            state = 3
+                            break
+                    if state == 0:
+                        result[12] += 1
+        return result
+
+else:
+    _event_statistics_kernel = None
+
+
+_STATISTIC_KEYS = tuple(empty_statistics())
+
+
+def _normalized_pair(
+    prediction: RayEvents, ground_truth: RayEvents, delta_m: float
+) -> tuple[RayEvents, RayEvents]:
+    if delta_m <= 0:
+        raise ValueError("delta_m must be positive")
+    pred = prediction.normalized()
+    gt = ground_truth.normalized()
+    if pred.shape[1:] != gt.shape[1:]:
+        raise ValueError(f"Image shapes differ: {pred.shape[1:]} vs {gt.shape[1:]}")
+    return pred, gt
+
+
+def _event_statistics_reference(
+    prediction: RayEvents, ground_truth: RayEvents, delta_m: float
+) -> dict[str, float]:
+    """Test hook for exact comparison with the portable implementation."""
+
+    pred, gt = _normalized_pair(prediction, ground_truth, delta_m)
+    return _event_statistics_python(pred, gt, delta_m)
+
+
+def event_statistics(prediction: RayEvents, ground_truth: RayEvents, delta_m: float) -> dict[str, float]:
+    """Return additive event-matching statistics for one frame."""
+
+    pred, gt = _normalized_pair(prediction, ground_truth, delta_m)
+    if _event_statistics_kernel is None:
+        return _event_statistics_python(pred, gt, delta_m)
+    values = _event_statistics_kernel(
+        pred.depths_m,
+        pred.valid_mask,
+        pred.transition_type,
+        gt.depths_m,
+        gt.valid_mask,
+        gt.transition_type,
+        delta_m,
+    )
+    return {key: float(value) for key, value in zip(_STATISTIC_KEYS, values)}
 
 
 def summarize_statistics(stats: dict[str, float]) -> dict[str, float | None]:

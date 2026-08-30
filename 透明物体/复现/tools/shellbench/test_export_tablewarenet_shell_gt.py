@@ -68,8 +68,33 @@ def test_batch_exporter_writes_one_hollow_object_frame() -> None:
         )
         payload = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
         assert payload["summary"]["event_frames"] == 1
+        assert payload["items"][0]["shape_hw"] == [3, 1]
         event_path = output_dir / payload["items"][0]["event_file"]
         assert event_path.is_file()
+        with np.load(event_path) as events:
+            assert events["depths_m"].shape == (6, 3, 1)
+        # A resumed export must preserve the same explicit [H,W] contract in
+        # its regenerated manifest.
+        subprocess.run(
+            [
+                sys.executable,
+                str(EXPORTER),
+                "--official-root",
+                str(T2_ROOT),
+                "--data-root",
+                str(data_root),
+                "--output-dir",
+                str(output_dir),
+                "--view-indices",
+                "0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        resumed = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert resumed["items"][0]["shape_hw"] == [3, 1]
+        assert resumed["items"][0]["reused"] is True
 
 
 if __name__ == "__main__":

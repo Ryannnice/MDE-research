@@ -77,6 +77,15 @@ def test_per_object_evaluator_matches_and_scores() -> None:
         (prediction_root / "manifest.json").write_text(
             json.dumps([{"scene_id": "scene", "objects_file": "objects/scene.json"}]), encoding="utf-8"
         )
+        (prediction_root / "metrics.json").write_text(
+            json.dumps(
+                {
+                    "method": "T2SQNet_released_models_with_official_LangSAM",
+                    "input_protocol": "RGB; upstream LangSAM rgb2mask unchanged",
+                }
+            ),
+            encoding="utf-8",
+        )
         output = root / "metrics.json"
         subprocess.run(
             [
@@ -94,6 +103,8 @@ def test_per_object_evaluator_matches_and_scores() -> None:
             text=True,
         )
         metrics = json.loads(output.read_text(encoding="utf-8"))
+        assert metrics["method"] == "T2SQNet_released_models_with_official_LangSAM"
+        assert metrics["input_protocol"] == "RGB; upstream LangSAM rgb2mask unchanged"
         assert metrics["matching"]["matched_objects"] == 1
         assert metrics["ray_event_metrics"]["interface_f1"] == 1.0
         assert metrics["ray_event_metrics"]["transition_f1"] == 1.0

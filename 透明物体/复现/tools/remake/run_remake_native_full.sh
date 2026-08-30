@@ -14,6 +14,9 @@ dataset_root=$(realpath "$2")
 checkpoint=$(realpath "$3")
 depth_anything=$(realpath "$4")
 logname=$5
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+compat_dir=$(realpath "$script_dir/../transcg/native_compat")
+config=$(realpath "${REMAKE_NATIVE_CONFIG:-$script_dir/transcg_remake_native_shm_safe.yaml}")
 
 ensure_link() {
   local target=$1
@@ -37,5 +40,8 @@ ensure_link() {
 ensure_link "$dataset_root" "$official_root/datasets/transcg/transcg"
 ensure_link "$depth_anything" "$official_root/checkpoints/depth_anything_v2_vits.pth"
 cd "$official_root"
-exec python main.py --mode test --cfg configs/test/transcg_remake.yaml \
+export TRANSCG_OFFICIAL_DATASETS="$official_root/datasets"
+export PYTHONPATH="$compat_dir:$official_root${PYTHONPATH:+:$PYTHONPATH}"
+echo "ReMake native config: $config" >&2
+exec python main.py --mode test --cfg "$config" \
   --checkpoints "$checkpoint" --reldepth_model depthanything --logname "$logname"

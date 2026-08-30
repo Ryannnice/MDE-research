@@ -15,6 +15,7 @@ from ray_events import (
     SHELL_TO_AIR,
     SHELL_TO_CAVITY,
     RayEvents,
+    _event_statistics_reference,
     event_statistics,
     single_depth_events,
     summarize_statistics,
@@ -93,6 +94,32 @@ class RayEventsTest(unittest.TestCase):
             target = RayEvents.load(path)
         self.assertTrue(np.array_equal(source.valid_mask, target.valid_mask))
         self.assertTrue(np.allclose(source.depths_m, target.depths_m))
+
+    def test_accelerated_statistics_match_reference_randomized(self) -> None:
+        rng = np.random.default_rng(7)
+        transition_values = np.asarray(
+            [0, AIR_TO_SHELL, SHELL_TO_CAVITY, CAVITY_TO_SHELL, SHELL_TO_AIR], dtype=np.int8
+        )
+        for _ in range(40):
+            pred_shape = (int(rng.integers(1, 7)), 4, 5)
+            gt_shape = (int(rng.integers(1, 7)), 4, 5)
+            pred_valid = rng.random(pred_shape) > 0.35
+            gt_valid = rng.random(gt_shape) > 0.35
+            prediction = RayEvents(
+                rng.uniform(0.1, 1.5, pred_shape).astype(np.float32),
+                pred_valid,
+                rng.choice(transition_values, pred_shape),
+            )
+            ground_truth = RayEvents(
+                rng.uniform(0.1, 1.5, gt_shape).astype(np.float32),
+                gt_valid,
+                rng.choice(transition_values, gt_shape),
+            )
+            accelerated = event_statistics(prediction, ground_truth, 0.08)
+            reference = _event_statistics_reference(prediction, ground_truth, 0.08)
+            self.assertEqual(set(accelerated), set(reference))
+            for key in reference:
+                self.assertAlmostEqual(accelerated[key], reference[key], places=12, msg=key)
 
 
 if __name__ == "__main__":

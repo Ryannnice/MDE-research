@@ -57,6 +57,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default=None, help="defaults to cuda:0 when available")
     parser.add_argument("--no-save-predictions", action="store_true")
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="reuse complete cached batches while recomputing aggregate metrics",
+    )
+    parser.add_argument(
         "--skip-integrity-audit",
         action="store_true",
         help="debug only; a full release run audits every declared TransCG test asset",
@@ -148,14 +153,20 @@ def main() -> None:
         raise FileNotFoundError(f"Missing TransCG metadata: {dataset_root / 'metadata.json'}")
     if args.batch_size < 1 or args.num_workers < 0:
         raise ValueError("batch-size must be positive and num-workers non-negative")
+    if args.resume and args.no_save_predictions:
+        raise ValueError("--resume requires prediction caching")
     if args.max_samples is None and not args.skip_integrity_audit:
         require_complete_test_split(dataset_root)
 
     sys.path.insert(0, str(official_root))
+    # ReMake's checkout also uses a local ``datasets`` directory without an
+    # __init__.py.  Import the module directly so an installed Hugging Face
+    # package named datasets cannot shadow it.
+    sys.path.insert(0, str(official_root / "datasets"))
     import torch
     from torch.utils.data import DataLoader, Subset
 
-    from datasets.transcg import TransCG
+    from transcg import TransCG
     from models.remake import ReMake
     from run_utils.trainer import remake_trainer
     from utils.metrics import MetricsRecorder
@@ -208,20 +219,38 @@ def main() -> None:
         "L515": np.load(dataset_root / "camera_intrinsics" / "2-camIntrinsics-L515.npy"),
     }
     durations: list[float] = []
+    resumed_samples = 0
     offset = 0
     with torch.no_grad():
         for batch in loader:
             current_batch = int(batch["rgb"].shape[0])
+            source_samples = dataset.sample_info[offset : offset + current_batch]
+            relative_files = [
+                Path("predictions_m") / f"{sample_id(source_sample)[0]}.npy"
+                for source_sample in source_samples
+            ]
+            cached_batch = args.resume and all((output_dir / path).is_file() for path in relative_files)
             batch = to_device(batch, device)
-            start = perf_counter()
-            relative_depth = relative_depth_model.forward(batch["rgb_relat"]).unsqueeze(1)
-            remake_trainer(model, batch, relative_depth)
-            durations.append(perf_counter() - start)
+            if cached_batch:
+                predictions_m = np.stack(
+                    [np.load(output_dir / path).astype(np.float32) for path in relative_files]
+                )
+                if predictions_m.shape != (current_batch, 480, 640):
+                    raise ValueError(f"Invalid cached ReMake batch shape: {predictions_m.shape}")
+                if not np.all(np.isfinite(predictions_m)):
+                    raise ValueError("Cached ReMake predictions contain non-finite values")
+                batch["pred"] = torch.from_numpy(predictions_m).to(device)
+                resumed_samples += current_batch
+            else:
+                start = perf_counter()
+                relative_depth = relative_depth_model.forward(batch["rgb_relat"]).unsqueeze(1)
+                remake_trainer(model, batch, relative_depth)
+                durations.append(perf_counter() - start)
+                predictions_m = batch["pred"].detach().cpu().numpy().astype(np.float32)
             metrics.evaluate_batch(batch, record=True)
-            predictions_m = batch["pred"].detach().cpu().numpy().astype(np.float32)
-            for local_index, source_sample in enumerate(dataset.sample_info[offset : offset + current_batch]):
+            for local_index, source_sample in enumerate(source_samples):
                 identifier, record = sample_id(source_sample)
-                relative_file = Path("predictions_m") / f"{identifier}.npy"
+                relative_file = relative_files[local_index]
                 source_dir = Path(source_sample[0])
                 camera_type = int(source_sample[1])
                 camera_name = record["camera"]
@@ -237,8 +266,9 @@ def main() -> None:
                 prediction_intrinsics = source_intrinsics.copy()
                 prediction_intrinsics[0, :] *= prediction_width / source_width
                 prediction_intrinsics[1, :] *= prediction_height / source_height
-                if not args.no_save_predictions:
+                if not args.no_save_predictions and not cached_batch:
                     np.save(output_dir / relative_file, predictions_m[local_index])
+                if not args.no_save_predictions:
                     record["prediction_m"] = str(relative_file)
                 else:
                     record["prediction_m"] = None
@@ -265,6 +295,8 @@ def main() -> None:
         "relative_depth_weights": str(relative_depth_weights),
         "device": str(device),
         "samples": offset,
+        "resumed_cached_samples": resumed_samples,
+        "model_batches_executed": len(durations),
         "batch_size": args.batch_size,
         "mean_model_plus_relative_depth_seconds_per_batch": float(np.mean(durations)) if durations else None,
         "native_metrics": jsonable(native_metrics),

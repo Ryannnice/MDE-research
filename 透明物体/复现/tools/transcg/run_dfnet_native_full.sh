@@ -4,6 +4,8 @@
 # shared-G0 entrypoint; this script is the native aggregate-metric cross-check.
 set -euo pipefail
 
+workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+
 if [[ $# -ne 3 ]]; then
   echo "usage: $0 <official-root> <transcg-root> <dfnet-checkpoint>" >&2
   exit 2
@@ -36,4 +38,7 @@ ensure_link() {
 ensure_link "$dataset_root" "${official_root}/data"
 ensure_link "$checkpoint" "${official_root}/stats/train-tg-val-tg/checkpoint.tar"
 cd "$official_root"
+compat_dir="${workspace_root}/透明物体/复现/tools/transcg/native_compat"
+export TRANSCG_OFFICIAL_DATASETS="${official_root}/datasets"
+export PYTHONPATH="${compat_dir}:${official_root}${PYTHONPATH:+:${PYTHONPATH}}"
 exec python test.py --cfg "${config}"

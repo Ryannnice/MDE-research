@@ -17,6 +17,11 @@ Valid layers are sorted front-to-back and invalid entries are trailing zeros.
 Transition labels are `1=air→shell`, `2=shell→cavity`,
 `3=cavity→shell`, and `4=shell→air`.
 
+TablewareNet stores `camera_image_size` as `[height, width]`. The released
+processed test therefore uses `(H,W)=(240,320)`; adapters and manifests must
+preserve this explicit contract. Results produced by the earlier transposed
+320×240 ray grid are invalid.
+
 Single-depth baselines export exactly one event per pixel. They must not fill
 unknown back-side geometry or label unknown space as solid. The planner stage
 will compare explicitly named optimistic and conservative unknown-space
@@ -95,7 +100,7 @@ conda run -n transparent-baselines-gpu python \
   透明物体/复现/tools/shellbench/export_tablewarenet_shell_gt.py \
   --official-root 透明物体/external/t2sqnet/official \
   --data-root <TablewareNet/test_processed> \
-  --output-dir 透明物体/runs/shellbench/tablewarenet_gt_per_object
+  --output-dir 透明物体/runs/shellbench/tablewarenet_gt_per_object_hw_correct
 
 conda run -n transparent-baselines-gpu python \
   透明物体/复现/tools/shellbench/test_export_tablewarenet_shell_gt.py
@@ -112,5 +117,17 @@ the pipe's inner/outer geometry and wall parameter. TransCG meshes are not
 admitted as shell-topology GT until an equivalent rim/thickness audit exists.
 
 The released T²SQNet model can be evaluated against this contract through
-`../t2sqnet/run_t2sqnet_gt_masks.py`. Its GT-mask path is a diagnostic oracle
-only; it never substitutes for the RGB-segmentation result.
+`../t2sqnet/run_t2sqnet_gt_masks.py` and
+`../t2sqnet/run_t2sqnet_rgb_full.py`. The GT-mask path is a diagnostic oracle;
+the official LangSAM RGB path is reported separately.
+
+The fixed-candidate target-shell collision gate is implemented by
+`evaluate_grasp_collision_oracles.py`. It compares front-only and full-event
+policies on exactly the same released-planner-derived candidate set. It does not evaluate
+IK, furniture, other objects, execution noise, or robot task success.
+
+The released superellipse perimeter sampler can enter a multi-million-step
+loop for pathological low-exponent predictions. The evaluator keeps normal
+upstream grids exactly and uses a deterministic arc-length fallback only after
+a frozen iteration cap; every fallback call and parameter set is written to
+the result JSON.

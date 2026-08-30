@@ -1,158 +1,77 @@
-# TransCG / DFNet 最小复现记录
+# TransCG / DFNet 完整复现记录
 
-日期: 2026-07-01
-
-目标: 先复现一个透明物体深度补全方法的可执行闭环。这里选择 [TransCG / DFNet](https://github.com/galaxies99/transcg)，因为它是透明 RGB-D depth completion 的基础数据集和经典机器人抓取基线。
-
-## 论文工作讲解
-
-TransCG 的问题设定是透明物体 RGB-D depth completion。输入不是单 RGB，而是 RGB 图像加原始深度图。透明物体会让 RealSense 这类 RGB-D 传感器出现空洞、背景错深度或局部噪声；论文目标是在透明区域把 raw depth 修成更接近真实表面的稠密深度，供抓取、点云和碰撞检查使用。
-
-论文主要贡献有三点:
-
-1. 发布 TransCG 数据集。它包含 57,715 张真实 RGB-D 图像，覆盖 51 个透明物体、130 个真实场景，并提供相机内参、透明物体 mesh、pose、mask、surface normal 和 refined ground-truth depth。
-2. 提出 DFNet 作为 depth filler baseline。DFNet 输入 RGB 和原始 depth，使用多尺度卷积/稠密块结构补全透明区域深度。它本质上是一个透明物体 RGB-D depth restoration 网络，不是单目深度模型。
-3. 用机器人抓取展示下游价值。补全后的深度可以生成更完整点云，减少透明区域深度缺失对 suction/parallel-jaw grasp 的影响。
-
-它的关键边界:
-
-- 优点: 数据集真实、任务定义清楚、代码和 checkpoint 公开，适合作为透明物体复现第一基线。
-- 限制: 输入依赖 RGB-D raw depth；如果原始深度完全不可用或机器人只有单 RGB，不能直接等同于单目 MDE。
-- 对后续工作的威胁: 任何透明 depth 方法都至少要解释自己相对 raw depth、DFNet、TODE、ReMake 这类 RGB-D completion baseline 的优势。
-
-## 当前状态
-
-### 2026-07-26 全量复现更新
-
-- 新建并验证了 GPU 统一环境 `transparent-baselines-gpu`（PyTorch 2.8.0+cu128、RTX 5880 Ada）。
-- 已实现 `audit_transcg.py`、全 test 的 DFNet cache runner 和不改上游 `test.py` 的 native cross-check wrapper；只有 23,524 个 test sample 全部存在时才允许写 `official_full_test`。
-- `transcg-info.zip` 与 `transcg-data-1.zip` 已通过 `unzip -t`，第 1 分块已解压；这**不是** test split 的可用子集，也没有产生任何 benchmark 数字。
-- 官方 Google Drive 在下载第 2–13 分块时返回全局 quota exceeded。已用 gdown 与直接确认 URL 两种方式复核；下载器保留已完整分块并支持之后继续。官方还提供百度入口，但在没有可用的百度账号/下载授权时不能自动化获取。
-
-因此截至此更新，DFNet 仍是“checkpoint + synthetic/GPU forward 已验证、官方全 test 等待上游数据可用”，而不是 full reproduction。
-
-已完成:
-
-- 官方代码已克隆到 `透明物体/external/transcg/official/`，提交为 `135f9e0ad20592cb40b288c152aff5eda033a765`。
-- conda 环境 `transcg` 已创建，Python 3.10。
-- 已安装 CPU 版 PyTorch 和最小 inference 依赖。
-- 官方 checkpoint 已下载到 `透明物体/weights/transcg/checkpoint.tar`，文件大小约 5.2MB，checkpoint epoch 为 12。
-- 已添加无 GUI 最小脚本 `透明物体/复现/tools/transcg/run_dfnet_minimal.py`。
-- 已跑通一次合成 RGB-D smoke test，输出在 `透明物体/runs/transcg/minimal_synthetic/`。
-
-未完成:
-
-- 未下载官方真实 TransCG 数据分块。官方 `scene21-30` 分块为 `transcg-data-3.zip`，约 15.1GB；完整 TransCG 数据由 13 个大分块组成。
-- 当前 smoke test 的 MAE/RMSE 只验证代码闭环，不代表论文或官方 TransCG test split 结果。
-
-## 文件夹结构
-
-```text
-透明物体/
-  external/transcg/official/        # 官方 TransCG 代码，git clone，忽略入库
-
-  weights/transcg/checkpoint.tar    # 官方 DFNet checkpoint，忽略入库
-
-  runs/transcg/minimal_synthetic/
-      input_rgb.png
-      input_depth_raw_mm.png
-      dfnet_depth_mm.png
-      dfnet_depth_vis.png
-      summary.json
-
-  复现/tools/transcg/run_dfnet_minimal.py
-
-  复现/TransCG_DFNet.md
-```
-
-这个结构遵守当前三类目录: 透明物体相关外部代码、权重、输出和复现记录都收在 `透明物体/` 下。真实数据如需下载, 建议放 `透明物体/data/` 并继续忽略入库。
-
-## 环境
-
-```bash
-conda create -y -n transcg python=3.10
-conda run -n transcg python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-conda run -n transcg python -m pip install numpy scipy pillow pyyaml tqdm einops opencv-python gdown
-```
-
-smoke test 环境版本:
-
-```text
-torch 2.12.1+cpu
-numpy 2.2.6
-opencv-python 4.13.0
-```
-
-说明: 第一次只跑单样本 inference，所以使用 CPU 版 PyTorch，避免 RTX 5090 与老 PyTorch/CUDA 组合的兼容问题。后续跑全量评测时可以单独建 GPU 环境。
-
-## 已执行命令
-
-```bash
-mkdir -p 透明物体/external/transcg 透明物体/weights/transcg 透明物体/runs/transcg
-git clone https://github.com/galaxies99/transcg.git 透明物体/external/transcg/official
-
-conda run -n transcg gdown 1oZi9zdOg0WYuTHM10xlyq5FRlfoKDKzU \
-  -O 透明物体/weights/transcg/checkpoint.tar
-
-conda run -n transcg python 透明物体/复现/tools/transcg/run_dfnet_minimal.py \
-  --out-dir 透明物体/runs/transcg/minimal_synthetic
-```
-
-输出摘要:
-
-```json
-{
-  "source": "synthetic",
-  "checkpoint_epoch": 12,
-  "input_shape_hwc": [480, 640, 3],
-  "official_inference_size_wh": [320, 240],
-  "raw_valid_ratio": 0.8985611979166667,
-  "pred_min_m": 0.6216562986373901,
-  "pred_max_m": 0.7883589267730713,
-  "pred_mean_m": 0.7043432593345642,
-  "gt_available": true,
-  "mae_m": 0.001014457899145782,
-  "rmse_m": 0.0018889900529757142
-}
-```
-
-## 接真实 TransCG 数据
-
-官方数据页: [https://graspnet.net/transcg](https://graspnet.net/transcg)
-
-官方页面说明 TransCG 提供 RGB-D 原图、refined GT depth、transparent object pose、mask、surface normals 和模型；数据结构为 `scene1/ ... scene130/`，并提供 `camera_intrinsics/`、`models/` 和 `metadata.json`。
-
-若要复现官方 `sample_inference.py` 中的 `scene21/1`，需要下载:
-
-- `transcg-info.zip`: 149.3MB，Google Drive id `18LkbelKNTURF-8f8N-ykzs79FJ013knH`
-- `transcg-data-3.zip`: scene 21-30，15.1GB，Google Drive id `19tXZ9lzpW2gUk1ibkij76I_-oknCbqyP`
-
-建议真实数据放:
-
-```text
-透明物体/data/transcg/
-```
-
-下载命令:
-
-```bash
-mkdir -p 透明物体/data/transcg
-conda run -n transcg gdown 18LkbelKNTURF-8f8N-ykzs79FJ013knH \
-  -O 透明物体/data/transcg/transcg-info.zip
-conda run -n transcg gdown 19tXZ9lzpW2gUk1ibkij76I_-oknCbqyP \
-  -O 透明物体/data/transcg/transcg-data-3.zip
-```
-
-解压后按实际根目录调整路径。若得到 `scene21/1/rgb1.png`、`depth1.png`、`depth1-gt.png`，可直接运行:
-
-```bash
-conda run -n transcg python 透明物体/复现/tools/transcg/run_dfnet_minimal.py \
-  --rgb 透明物体/data/transcg/scene21/1/rgb1.png \
-  --depth 透明物体/data/transcg/scene21/1/depth1.png \
-  --gt 透明物体/data/transcg/scene21/1/depth1-gt.png \
-  --out-dir 透明物体/runs/transcg/scene21_1_dfnet
-```
+更新日期：2026-08-30
 
 ## 结论
 
-TransCG / DFNet 的代码、checkpoint、最小 inference 链路已经跑通。下一步如果要做真实复现，应下载 `transcg-data-3.zip`，先跑 `scene21/1`，再扩展到固定小子集，最后才跑完整 test split。
+DFNet 的当前官方 release 已在 TransCG official test **23,524 / 23,524** 张上完成原生评测和独立 cache-runner 交叉核验。它可以作为我们的 RGB-D single-depth completion baseline，但不能写成“论文旧 checkpoint 的逐项复现”：官方 README 明确说明当前发布权重与 paper checkpoint 不同。
+
+## 数据与版本
+
+| 项目 | 值 |
+| --- | --- |
+| 数据 | TransCG official test，52 scenes，23,524 samples |
+| official commit | `135f9e0ad20592cb40b288c152aff5eda033a765` |
+| checkpoint epoch | 12 |
+| checkpoint SHA-256 | `7d706a0b3ecf94e086e46abc9e640858790bb680f8994ad6c564f7e9c4ad83fe` |
+| 输入 | RGB + raw RGB-D depth |
+| 网络分辨率 | 320 × 240 |
+| 输出 | metric depth，m |
+
+13 个数据分块均已下载、解压并通过样本结构审计；早期 Google Drive quota blocker 已解除。
+
+## 当前官方 release 的完整结果
+
+以下数字来自上游未改动的 `test.py` 原生入口：
+
+| 指标 | all | transparent mask |
+| --- | ---: | ---: |
+| RMSE ↓ | 0.018456 m | 0.032787 m |
+| REL ↓ | 0.020245 | 0.057680 |
+| MAE ↓ | 0.009905 m | 0.025963 m |
+| δ1.05 ↑ | 89.8767% | 63.2562% |
+| δ1.10 ↑ | 95.2869% | 80.4670% |
+| δ1.25 ↑ | 99.2927% | 97.7137% |
+
+作为必要输入对照，同一官方预处理后的 identity raw depth 为：
+
+| 指标 | all | transparent mask |
+| --- | ---: | ---: |
+| RMSE ↓ | 0.020116 m | 0.045293 m |
+| REL ↓ | 0.015600 | 0.076890 |
+| MAE ↓ | 0.007023 m | 0.034920 m |
+| δ1.05 ↑ | 90.3389% | 52.1190% |
+
+因此当前 DFNet 相对其实际输入，将 masked RMSE 从 45.293 mm 降到 32.787 mm；这比单看模型分数更能确认模型确实在透明区域产生了有效修复。
+
+## 独立交叉核验
+
+cache runner 保存了 23,524 张逐帧 metric-depth prediction，再与原生入口汇总值比较：
+
+- sample 数一致；
+- RMSE 绝对差约 `2.96e-6 m`；
+- 最大差为 masked δ1.05 的 `0.0031` 个百分点；
+- 在冻结容差内判定 `PASS`。
+
+差异来自原生 loader shuffle 后浮点累加顺序不同，不改变结论。
+
+## 执行入口
+
+```bash
+# cache + per-frame predictions
+CUDA_VISIBLE_DEVICES=0 conda run -n transparent-baselines-gpu python \
+  透明物体/复现/tools/transcg/run_dfnet_full.py \
+  --official-root 透明物体/external/transcg/official \
+  --dataset-root 透明物体/data/transcg/transcg \
+  --checkpoint-path 透明物体/weights/transcg/checkpoint.tar \
+  --output-dir 透明物体/runs/transcg/dfnet_release_test
+
+# upstream native test.py cross-check
+CUDA_VISIBLE_DEVICES=0 conda run -n transparent-baselines-gpu bash \
+  透明物体/复现/tools/transcg/run_dfnet_native_full.sh \
+  透明物体/external/transcg/official \
+  透明物体/data/transcg/transcg \
+  透明物体/weights/transcg/checkpoint.tar
+```
+
+逐帧预测约 7.2 GB，位于 `runs/transcg/dfnet_release_test/predictions_m`，由 Git 忽略。结果归属与其他 baseline 的横向边界见 [复现进度总览（2026-08-30）](复现进度总览_2026-08-30.md)。

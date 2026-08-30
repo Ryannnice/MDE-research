@@ -127,6 +127,7 @@ def main() -> None:
                     filename = f"{identifier}__{object_label}__view{view_index}.npz"
                     event_path = events_dir / filename
                     if event_path.is_file() and not args.overwrite:
+                        camera_size = as_numpy(cameras[view_index]["camera_image_size"]).reshape(-1)
                         manifest.append(
                             {
                                 "scene_id": identifier,
@@ -136,6 +137,7 @@ def main() -> None:
                                 "object_index": object_index,
                                 "view_index": view_index,
                                 "event_file": str(event_path.relative_to(output_dir)),
+                                "shape_hw": [int(camera_size[0]), int(camera_size[1])],
                                 "hollow_primitives": provenance,
                                 "ground_truth_object": gt_object,
                                 "reused": True,
