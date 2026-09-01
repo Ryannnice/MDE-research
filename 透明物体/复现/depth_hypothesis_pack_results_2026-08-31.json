@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-31",
+  "method": "DepthHypothesisPackLite_v0",
+  "status": "formal_v0_completed_main_gate_failed",
+  "result_origin_contract": {
+    "synthetic_validation": "LayeredDepth-Syn held-out split; model and presence-threshold selection only.",
+    "unified_benchmark": "Common local protocol; not a source-paper table number.",
+    "oracle_diagnostic": "Uses frozen GT association or geometry only to isolate representation/action effects; not a deployable score."
+  },
+  "training": {
+    "dataset": "princeton-vl/LayeredDepth-Syn",
+    "dataset_revision": "78fd900929879332e60d7190d9bd423b8432669b",
+    "dataset_samples": 14800,
+    "source_shards": 56,
+    "cache_manifest_sha256": "28089ff37d2a13c06ed79decf190a1181aa5eae6fb8daa935b42f82427dc8f71",
+    "split": {
+      "seed": 42,
+      "train_samples": 13320,
+      "held_out_samples": 1480,
+      "real_evaluation_leakage": false
+    },
+    "model": {
+      "encoder": "ImageNet ResNet-18, fine-tuned",
+      "decoder": "lightweight FPN plus full-resolution RGB refinement",
+      "max_hypotheses": 4,
+      "output": "ordered metric depth, monotone presence, positive uncertainty",
+      "input_crop": 192,
+      "decoder_channels": 64
+    },
+    "optimization": {
+      "epochs": 5,
+      "batch_size": 4,
+      "decoder_learning_rate": 0.0003,
+      "encoder_learning_rate": 0.00003,
+      "weight_decay": 0.0001,
+      "elapsed_seconds": 3309.4270767589915
+    },
+    "best_checkpoint": {
+      "epoch_zero_based": 4,
+      "path": "透明物体/runs/depth_hypothesis_pack/train14800_balanced_highres_v3_seed42/best.pt",
+      "sha256": "8fe83b695bb30ecbec1baa035ee0f954218fc9b4683fcc9ca54f9a02d03a76e8"
+    },
+    "held_out_metrics_at_best": {
+      "loss": 0.7713001309214411,
+      "depth_mae_m": 0.5228205824444143,
+      "front_mae_m": 0.4728280610096865,
+      "presence_f1_at_0_5": 0.8908594819196446,
+      "presence_f1_by_layer_at_0_5": [
+        0.9993871652804143,
+        0.6023690658959201,
+        0.4228769872565787,
+        0.015755981022654436
+      ]
+    },
+    "presence_calibration": {
+      "source": "synthetic held-out split only",
+      "real_evaluation_data_used": false,
+      "thresholds": [0.9045, 0.6825, 0.4265, 0.269],
+      "f1_by_layer": [
+        0.9993871652804143,
+        0.62957762861089,
+        0.44656793418449825,
+        0.28366508208442004
+      ],
+      "artifact_sha256": "ae2b521b3bfb17dafafc1f3458cb978c4474a88515462e633995d983ec89275e"
+    }
+  },
+  "layereddepth_validation": {
+    "origin": "unified_benchmark",
+    "samples": 300,
+    "prediction_files": 1200,
+    "prediction_space": "metric_depth_m",
+    "metrics": {
+      "layer_first": {
+        "pair": 0.7033137292101436,
+        "trip": 0.507678664056356,
+        "quad": 0.41625650975186357
+      },
+      "layer_all": {
+        "pair": 0.5730177385410118,
+        "trip": 0.39914291752055475,
+        "quad": 0.3203876203176871
+      },
+      "mixed": {
+        "pair": 0.4853985937357319,
+        "trip": 0.29533876017532873,
+        "quad": 0.20449438202247192
+      }
+    },
+    "comparisons": {
+      "dpt_base_layer_all_quad": 0.2995428470331791,
+      "midas_v21_base_layer_all_quad": 0.3484209946540308,
+      "seegroup_release_layer_all_quad": 0.7241393123177605,
+      "pilot1000_layer_first_quad": 0.3941727083971544,
+      "pilot1000_layer_all_quad": 0.3230964894858156,
+      "pilot1000_mixed_quad": 0.23912665985699694
+    },
+    "artifact": "透明物体/runs/depth_hypothesis_pack/layereddepth_validation_formal14800_v3_seed42/evaluation_both.json",
+    "artifact_sha256": "8763bd27cf956f397b98c01588205a06feb0050267ba10896bdb59dbe0485f60"
+  },
+  "shellbench_interfaces": {
+    "origin": "oracle_diagnostic",
+    "adapter_oracles": [
+      "GT object identity",
+      "GT object association",
+      "GT rendered first-surface visibility"
+    ],
+    "scenes": 98,
+    "objects": 259,
+    "object_view_event_maps": 1813,
+    "mean_events_per_predicted_ray": 1.4767940388776306,
+    "matching_tolerance_m": 0.005,
+    "metrics": {
+      "interface_precision": 0.016004540514804575,
+      "interface_recall": 0.006493373282586984,
+      "interface_f1": 0.00923849710820405,
+      "matched_interface_mae_m": 0.0022948683664199537,
+      "transition_f1": null
+    },
+    "comparisons": {
+      "pilot1000_interface_f1": 0.012822577990077424,
+      "rendered_front_interface_f1": 0.4310411884750287
+    },
+    "artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_events_formal14800_v3_seed42/evaluation.json",
+    "artifact_sha256": "28c912cd7c1a72f6fe6aafeea539cbbe6d300eb24b8f8a41be2fd91e3c7fdc7e"
+  },
+  "fixed_planner": {
+    "origin": "oracle_diagnostic",
+    "scope": "offline target-shell collision gate; no IK, furniture, other-object collision, execution, or robot task-success claim",
+    "matched_objects": 244,
+    "candidates": 7983,
+    "policies": {
+      "front_optimistic": {
+        "safe_selected": 223,
+        "collision_selected": 21,
+        "rejected": 0,
+        "candidate_collision_recall": 0.30639097744360905
+      },
+      "front_conservative": {
+        "safe_selected": 197,
+        "collision_selected": 5,
+        "rejected": 42,
+        "candidate_collision_recall": 0.575187969924812
+      },
+      "k_event_fixed_parity": {
+        "safe_selected": 198,
+        "collision_selected": 5,
+        "rejected": 41,
+        "candidate_collision_recall": 0.5695488721804511,
+        "collision_free_selection_rate_all_objects": 0.8114754098360656,
+        "bootstrap_95_ci": [0.7541666666666667, 0.8692074848651623]
+      },
+      "gt_full_events": {
+        "safe_selected": 244,
+        "collision_selected": 0,
+        "rejected": 0
+      }
+    },
+    "pilot1000_k_event_fixed_parity": {
+      "safe_selected": 147,
+      "collision_selected": 1,
+      "rejected": 96
+    },
+    "dish_failure_slice_k_event_fixed_parity": {
+      "objects": 29,
+      "safe_selected": 20,
+      "collision_selected": 5,
+      "rejected": 4
+    },
+    "artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_events_formal14800_v3_seed42/grasp_collision.json",
+    "artifact_sha256": "380c1c1669f11ca41795957f913792a000c456bb8ed142fb57e130c1da86bb01"
+  },
+  "gate_decision": {
+    "representation_signal": {
+      "status": "partial_pass",
+      "evidence": "Mixed-layer accuracy is non-zero and K-event parity changes one planner decision relative to the same model's conservative front policy."
+    },
+    "main_performance": {
+      "status": "fail",
+      "evidence": "LayeredDepth all-quad is below MiDaS Base and SeeGroup; ShellBench interface F1 is far below rendered-front."
+    },
+    "full_data_scaling": {
+      "status": "fail",
+      "evidence": "14,800-sample training improves front quad and planner coverage, but degrades mixed quad and interface F1 relative to the 1,000-sample pilot."
+    },
+    "action_utility": {
+      "status": "fail",
+      "evidence": "K-event parity gains only one safe selection over the same model's front-conservative policy and remains at 198 safe, 5 collision, 41 rejected versus GT 244/0/0."
+    },
+    "transition_topology": {
+      "status": "deferred",
+      "evidence": "v0 intentionally predicts no transition type; transition metrics remain N/A."
+    }
+  },
+  "recommended_next_experiment": {
+    "decision": "stop_scaling_resnet18_v0",
+    "priority": [
+      "Replace the RGB encoder with frozen DINOv2 or Depth-Anything features while keeping the same K=4 head and benchmark.",
+      "Add SeeGroup teacher distillation for ordered depths and presence using synthetic data only.",
+      "Add explicit cross-domain metric-scale calibration without fitting on the real evaluation splits.",
+      "Only after interface quality clears the gate, add transition-type prediction and train the downstream planner head."
+    ]
+  }
+}

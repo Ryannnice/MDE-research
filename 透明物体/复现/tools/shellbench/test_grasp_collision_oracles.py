@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import unittest
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -19,10 +20,23 @@ from evaluate_grasp_collision_oracles import (
     classify_depth_queries,
     collision_predictions,
     collision_predictions_batch,
+    parse_labeled_roots,
 )
 
 
 class CollisionPolicyTests(unittest.TestCase):
+    def test_labeled_roots_support_multi_depth_and_reject_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "manifest.json").write_text("[]\n", encoding="utf-8")
+            (root / "metrics.json").write_text("{}\n", encoding="utf-8")
+            parsed = parse_labeled_roots([f"dhp={root}"], "multi-depth-root")
+            self.assertEqual(parsed, {"dhp": root.resolve()})
+            with self.assertRaisesRegex(ValueError, "Duplicate multi-depth-root"):
+                parse_labeled_roots(
+                    [f"dhp={root}", f"dhp={root}"], "multi-depth-root"
+                )
+
     def test_bounded_sampler_preserves_regular_upstream_grid(self) -> None:
         import torch
         from tablewarenet.primitive_grasp_planner import delta_theta, sq_uniform_sampling_2D

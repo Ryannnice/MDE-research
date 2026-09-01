@@ -1,0 +1,485 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-31",
+  "method_family": "DepthHypothesisPackLite_v0_v1",
+  "status": "strong_encoder_teacher_and_scale_diagnostics_completed_main_gate_failed",
+  "result_origin_contract": {
+    "synthetic_validation": "LayeredDepth-Syn held-out split; model and presence-threshold selection only.",
+    "unified_benchmark": "Common local protocol; not a source-paper table number.",
+    "oracle_diagnostic": "Uses frozen GT association, rendered geometry, or evaluation-side anchor inputs to isolate representation, scale, or action effects; not a deployable score.",
+    "native_reproduction": "Released checkpoint evaluated through the repository-native or exactly cross-checked path."
+  },
+  "controlled_experiment_contract": {
+    "unchanged_components": [
+      "K=4 ordered metric-depth head",
+      "monotone presence and positive uncertainty output contract",
+      "loss",
+      "LayeredDepth-Syn cache and deterministic split",
+      "presence calibration restricted to synthetic held-out samples",
+      "LayeredDepth evaluator",
+      "ShellBench adapter and evaluator",
+      "frozen primitive candidate planner"
+    ],
+    "important_caveat": "The ResNet-18 formal encoder was fine-tuned while the DINOv2-S formal encoder was frozen. The exact frozen-encoder comparison is the 1,000-sample DINOv2-S versus Depth Anything V2-S pilot."
+  },
+  "encoder_screening": {
+    "dinov2_small_overfit4_frozen": {
+      "best_epoch_zero_based": 299,
+      "depth_mae_m": 0.10865643534689676,
+      "front_mae_m": 0.07910010549757215,
+      "presence_f1_at_0_5": 0.9491315831516135,
+      "status": "pass_trainability"
+    },
+    "dinov2_small_overfit4_last_block_trainable": {
+      "best_epoch_zero_based": 298,
+      "depth_mae_m": 0.11407825152541089,
+      "front_mae_m": 0.08218995730082194,
+      "presence_f1_at_0_5": 0.9436857683137385,
+      "status": "rejected_worse_than_frozen"
+    },
+    "depth_anything_v2_small_overfit4_frozen": {
+      "best_epoch_zero_based": 297,
+      "depth_mae_m": 0.13634996228606158,
+      "front_mae_m": 0.08816927726870019,
+      "presence_f1_at_0_5": 0.9765554505507412,
+      "status": "pass_trainability"
+    },
+    "frozen_1000_sample_pilot": {
+      "shared_protocol": {
+        "dataset": "princeton-vl/LayeredDepth-Syn train",
+        "samples": 1000,
+        "seed": 42,
+        "train_samples": 800,
+        "held_out_samples": 200,
+        "epochs": 20,
+        "batch_size": 4,
+        "crop_size": 192,
+        "decoder_channels": 64,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.0001,
+        "real_evaluation_data_used": false
+      },
+      "dinov2_small": {
+        "best_epoch_zero_based": 17,
+        "depth_mae_m": 0.5222169007906132,
+        "front_mae_m": 0.4648127016127664,
+        "presence_f1_at_0_5": 0.9005140396849245,
+        "presence_thresholds": [0.954, 0.536, 0.35, 0.2135],
+        "calibrated_pooled_presence_f1": 0.8799256262495082
+      },
+      "depth_anything_v2_small": {
+        "best_epoch_zero_based": 18,
+        "depth_mae_m": 0.537101112873502,
+        "front_mae_m": 0.47724260427278237,
+        "presence_f1_at_0_5": 0.8755154251658436,
+        "presence_thresholds": [0.9125, 0.656, 0.427, 0.2715],
+        "calibrated_pooled_presence_f1": 0.8678408927356467,
+        "checkpoint": "透明物体/runs/depth_hypothesis_pack/train1000_dav2s_frozen_v1_seed42/best.pt",
+        "checkpoint_sha256": "969eab33424d32e037632bb15720281049fcd09dc07c2edb28de920884115270",
+        "calibration_sha256": "b5a725c86b1ba68feca1bc6d5e1f3e3a7852b2f2f7775f6b96644d4ee297b7fc"
+      },
+      "decision": "stop_depth_anything_v2_before_14800",
+      "reason": "Depth Anything V2-S is worse on all four pilot criteria and its calibrated pooled presence F1 is below the 0.87 pilot floor."
+    },
+    "depth_anything_v2_provenance": {
+      "implementation": "official Depth Anything V2 DINO code loaded directly",
+      "source_root": "透明物体/external/remake/official/relat_depth_models",
+      "source_repository_commit": "4f568148c8421544136bf49bb941149e0c990a34",
+      "checkpoint": "透明物体/weights/depth-anything-v2/depth_anything_v2_vits.pth",
+      "checkpoint_sha256": "715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378",
+      "strict_state_load": "175_of_175_keys",
+      "approximate_huggingface_conversion_used_for_training": false
+    }
+  },
+  "dinov2_small_formal_training": {
+    "dataset": "princeton-vl/LayeredDepth-Syn train",
+    "dataset_revision": "78fd900929879332e60d7190d9bd423b8432669b",
+    "dataset_samples": 14800,
+    "split": {
+      "seed": 42,
+      "train_samples": 13320,
+      "held_out_samples": 1480,
+      "real_evaluation_leakage": false
+    },
+    "encoder": {
+      "model_id": "facebook/dinov2-small",
+      "huggingface_revision": "ed25f3a31f01632728cabb09d1542f84ab7b0056",
+      "frozen": true,
+      "pyramid_hidden_states": [3, 6, 9, 12]
+    },
+    "optimization": {
+      "epochs": 5,
+      "batch_size": 4,
+      "crop_size": 192,
+      "decoder_channels": 64,
+      "decoder_learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "elapsed_seconds": 3169.0638849509996
+    },
+    "best_validation": {
+      "epoch_zero_based": 4,
+      "loss": 0.6944422099235895,
+      "train_loss": 0.6738516568980955,
+      "depth_mae_m": 0.4714672716126902,
+      "front_mae_m": 0.41836056192404275,
+      "presence_f1_at_0_5": 0.9075886194543991
+    },
+    "presence_calibration": {
+      "source": "1480 synthetic held-out samples only",
+      "real_evaluation_data_used": false,
+      "thresholds": [0.872, 0.6715, 0.406, 0.2255],
+      "f1_by_layer": [
+        0.9993871652804143,
+        0.6947350728793377,
+        0.49049801284958205,
+        0.2962535613407577
+      ],
+      "pooled_f1": 0.8951421790220788,
+      "artifact_sha256": "a35770f0ea07b05180ee76d53f5d1668fac9c9d3a9b0c7091ad7eb8d2bc922a0"
+    },
+    "best_checkpoint": {
+      "path": "透明物体/runs/depth_hypothesis_pack/train14800_dinov2s_frozen_v1_seed42/best.pt",
+      "sha256": "479359af35b977fc7f55bcf6713558dbdb3513203e88263dce5ec11f690d13c4"
+    }
+  },
+  "layereddepth_validation": {
+    "origin": "unified_benchmark",
+    "samples": 300,
+    "prediction_files": 1200,
+    "tuple_denominators": {
+      "layer_first_pairs": 126504,
+      "layer_first_trips": 298815,
+      "layer_first_quads": 293790,
+      "layer_all_pairs": 256109,
+      "layer_all_trips": 610443,
+      "layer_all_quads": 599143,
+      "mixed_quads": 195800
+    },
+    "dinov2_small": {
+      "layer_first": {
+        "pair": 0.692910896098147,
+        "trip": 0.48083596874320234,
+        "quad": 0.39591204601926544
+      },
+      "layer_all": {
+        "pair": 0.5950747533276847,
+        "trip": 0.3991838713852071,
+        "quad": 0.32913010750355093
+      },
+      "mixed": {
+        "pair": 0.5649347091589809,
+        "trip": 0.32393237319974955,
+        "quad": 0.25122574055158325
+      }
+    },
+    "comparisons": {
+      "dpt_large_base": {
+        "layer_first_quad": 0.561983049116716,
+        "layer_all_quad": 0.2995428470331791,
+        "mixed_quad": 0
+      },
+      "midas_v21_base": {
+        "layer_first_quad": 0.6616630926852514,
+        "layer_all_quad": 0.3484209946540308,
+        "mixed_quad": 0
+      },
+      "dhp_resnet18_formal": {
+        "layer_first_quad": 0.41625650975186357,
+        "layer_all_quad": 0.3203876203176871,
+        "mixed_quad": 0.20449438202247192
+      },
+      "seegroup_release": {
+        "layer_first_quad": 0.7837196637053678,
+        "layer_all_quad": 0.7241393123177605,
+        "mixed_quad": 0.6660980592441267
+      },
+      "dinov2_minus_resnet_percentage_points": {
+        "layer_first_quad": -2.034446373259813,
+        "layer_all_quad": 0.874248718586383,
+        "mixed_quad": 4.673135852911133
+      }
+    },
+    "artifact": "透明物体/runs/depth_hypothesis_pack/layereddepth_validation_dinov2s_formal14800_v2_cpuupsample_seed42/evaluation_both.json",
+    "artifact_sha256": "f6a4dbb61952202f0636529d9e184a2600547292d051db0d56901d7d7425ec9f"
+  },
+  "seegroup_teacher_audit": {
+    "baseline_status": "retain_as_strong_real_layer_ordering_baseline",
+    "model_repository_commit": "765cbe45f218553a146f8f887c09310c1e96998e",
+    "checkpoint": "透明物体/weights/seegroup/seegroup.pth",
+    "checkpoint_sha256": "c21ccdd1595fbf7bbf6045c5825314cae5d302ad95a9f862c1088bbc4d7b9c77",
+    "parameter_count": 356264450,
+    "real_layereddepth_validation": {
+      "origin": "native_reproduction",
+      "samples": 300,
+      "layer_all_quad": 0.7241393123177605,
+      "mixed_quad": 0.6660980592441267
+    },
+    "synthetic_target_quality_audit": {
+      "origin": "synthetic_training_data_only",
+      "samples": 8,
+      "inference_resolution": 518,
+      "device": "cpu",
+      "dtype": "float32",
+      "paired_metric_depth_mae_m": 5.649888267286576,
+      "presence_f1": 0.5927976600432026,
+      "predicted_valid_fraction_per_sample_approx": 0.989,
+      "per_sample_depth_mae_m": [
+        4.68963657,
+        7.06578587,
+        5.2571965,
+        5.57010894,
+        4.75805388,
+        8.28828047,
+        5.52700528,
+        5.5878477
+      ],
+      "real_evaluation_data_used": false
+    },
+    "decision": "reject_raw_depth_and_presence_output_distillation",
+    "training_started": false,
+    "reason": "Strong real ordering accuracy does not transfer to reliable synthetic metric-depth or presence targets."
+  },
+  "tablewarenet_scale_diagnostics": {
+    "front_depth_gt_only_diagnostic": {
+      "origin": "oracle_diagnostic",
+      "rays": 2798936,
+      "dinov2_raw": {
+        "bias_m": 0.338165,
+        "median_error_m": 0.325516,
+        "mae_m": 0.345943,
+        "p90_absolute_error_m": 0.6273,
+        "within_5mm": 0.00616699,
+        "within_10mm": 0.01244044
+      },
+      "dinov2_gt_global_affine": {
+        "slope": 0.199383,
+        "offset_m": 0.520227,
+        "mae_m": 0.088004,
+        "within_5mm": 0.03429,
+        "allowed_as_method": false
+      },
+      "resnet18_raw": {
+        "bias_m": 0.27595,
+        "mae_m": 0.319759
+      },
+      "resnet18_gt_global_affine": {
+        "mae_m": 0.095109,
+        "allowed_as_method": false
+      },
+      "conclusion": "The domain error is not a single global scale constant."
+    },
+    "background_affine_anchor": {
+      "origin": "oracle_diagnostic",
+      "method": "per-frame robust affine, 1 percent tail trim plus 5 Huber IRLS iterations",
+      "source_views": 700,
+      "training_or_threshold_leakage": false,
+      "evaluation_input_uses_rendered_background_depth": true,
+      "anchor_uses_gt_union_object_mask": true,
+      "object_or_shell_depth_used_for_fit": false,
+      "slope_quantiles_min_p10_median_p90_max": [
+        0.11133622162563525,
+        0.32133609525525564,
+        0.4521003717876163,
+        0.6176874190371695,
+        0.8574971957774732
+      ],
+      "offset_m_quantiles_min_p10_median_p90_max": [
+        0.008920056998461726,
+        0.24037974247938665,
+        0.3521730746248543,
+        0.44835415638649356,
+        0.621246348022102
+      ],
+      "points_after_trim_min_median_max": [15257, 24976.5, 29390],
+      "per_frame_background_median_absolute_error_median": {
+        "raw_m": 0.11720696091651917,
+        "anchored_m": 0.056767597794532776
+      },
+      "gt_front_evaluation_not_used_for_fit": {
+        "rays": 2798936,
+        "bias_m": 0.108671,
+        "median_error_m": 0.111629,
+        "mae_m": 0.126896,
+        "p90_absolute_error_m": 0.235922,
+        "within_5mm": 0.0196996,
+        "within_10mm": 0.0394675
+      },
+      "prediction_artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_dinov2s_bganchor_v1_seed42",
+      "metrics_sha256": "456289e2d1582ebbaaab2650bf8d8e457df48172025de2b63dfe1aae522a9d50"
+    }
+  },
+  "shellbench_interfaces": {
+    "origin": "oracle_diagnostic",
+    "adapter_oracles": [
+      "GT object identity",
+      "GT object association",
+      "GT rendered first-surface visibility"
+    ],
+    "scenes": 98,
+    "objects": 259,
+    "matched_objects": 259,
+    "object_view_event_maps": 1813,
+    "evaluation_rays": 139238400,
+    "matching_tolerance_m": 0.005,
+    "dinov2_raw": {
+      "predicted_rays": 2798936,
+      "predicted_events": 6871839,
+      "mean_events_per_predicted_ray": 2.4551611755324165,
+      "interface_precision": 0.005241246193340677,
+      "interface_recall": 0.0035352635595570247,
+      "interface_f1": 0.00422244997058576,
+      "matched_interface_mae_m": 0.0022757782682763625,
+      "transition_f1": null,
+      "artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_events_dinov2s_formal14800_v1_seed42/evaluation.json",
+      "artifact_sha256": "5dc772efd6acaf40c21654b3eb203fe613e8ec5ea6a8b4482fbf2c6941b91b63"
+    },
+    "dinov2_background_anchor": {
+      "predicted_rays": 2798936,
+      "predicted_events": 6871839,
+      "mean_events_per_predicted_ray": 2.4551611755324165,
+      "interface_precision": 0.021010387466877497,
+      "interface_recall": 0.014171678727513208,
+      "interface_f1": 0.01692637717614382,
+      "matched_interface_mae_m": 0.002289225546866841,
+      "transition_f1": null,
+      "artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_events_dinov2s_bganchor_v1_seed42/evaluation.json",
+      "artifact_sha256": "fa35689c5222ebbe29c6532c2c4b880ab1dbf4e2c47cd2988b0c5b4bc38989e6"
+    },
+    "comparisons": {
+      "dhp_resnet18_formal_interface_f1": 0.00923849710820405,
+      "rendered_front_interface_f1": 0.4310411884750287,
+      "t2sqnet_rgb_langsam_interface_f1": 0.7427009085815202,
+      "t2sqnet_gt_mask_interface_f1": 0.79230856924327
+    },
+    "interpretation": "Background anchoring improves DINO interface F1 by about 4x but remains an oracle-input diagnostic and is far below usable shell geometry."
+  },
+  "fixed_planner": {
+    "origin": "oracle_diagnostic",
+    "scope": "offline target-shell collision gate; no IK, furniture, other-object collision, execution, or robot task-success claim",
+    "matched_objects": 244,
+    "candidates": 7983,
+    "surface_band_m": 0.002,
+    "seed": 0,
+    "bootstrap_replicates": 2000,
+    "resnet18_formal": {
+      "front_optimistic_safe_collision_reject": [223, 21, 0],
+      "front_conservative_safe_collision_reject": [197, 5, 42],
+      "k_event_parity_safe_collision_reject": [198, 5, 41]
+    },
+    "dinov2_raw": {
+      "front_optimistic_safe_collision_reject": [226, 18, 0],
+      "front_conservative_safe_collision_reject": [228, 5, 11],
+      "k_event_parity_safe_collision_reject": [229, 5, 10],
+      "k_event_candidate_collision_recall": 0.4323308270676692,
+      "artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_events_dinov2s_formal14800_v1_seed42/grasp_collision.json",
+      "artifact_sha256": "561af04d980e90ecd5c2cd3736e04b208194b9a96e6ee59eecb8e3cd0a2d336b"
+    },
+    "dinov2_background_anchor": {
+      "front_optimistic_safe_collision_reject": [227, 16, 1],
+      "front_conservative_safe_collision_reject": [206, 2, 36],
+      "k_event_parity_safe_collision_reject": [211, 2, 31],
+      "k_event_candidate_collision_recall": 0.7011278195488722,
+      "k_event_collision_free_selection_rate_all_objects": 0.8647540983606558,
+      "k_event_bootstrap_95_ci": [0.8196622555796959, 0.9061224489795918],
+      "dish_slice_k_event_parity_safe_collision_reject": [28, 1, 0],
+      "artifact": "透明物体/runs/depth_hypothesis_pack/tablewarenet_events_dinov2s_bganchor_v1_seed42/grasp_collision.json",
+      "artifact_sha256": "afc497e0da68a5c3cf1838a00aff603a5c3331380232a792059d5eaf43d6bf14"
+    },
+    "ground_truth": {
+      "front_optimistic_safe_collision_reject": [224, 20, 0],
+      "front_conservative_safe_collision_reject": [240, 0, 4],
+      "full_events_safe_collision_reject": [244, 0, 0]
+    }
+  },
+  "invalid_or_superseded_runs": [
+    {
+      "run": "initial DINO LayeredDepth full-resolution GPU upsample",
+      "reason": "CUDA OOM at sample 165",
+      "formal_result_used": false,
+      "superseded_by": "complete 300-sample CPU-upsample run"
+    },
+    {
+      "run": "generic ShellBench evaluator with static method metadata",
+      "reason": "metadata mismatch produced zero evaluated samples",
+      "formal_result_used": false,
+      "superseded_by": "dynamic metadata adapter and complete 139238400-ray evaluation"
+    },
+    {
+      "run": "Depth Anything V2 weights mapped into Hugging Face DINO",
+      "reason": "state keys loaded but forward features differed because model implementations were not equivalent",
+      "formal_result_used": false,
+      "superseded_by": "official implementation strict-load pilot"
+    },
+    {
+      "run": "overfit presence calibration",
+      "reason": "calibrator correctly requires an isolated held-out split",
+      "formal_result_used": false,
+      "classification": "expected_leakage_guard"
+    }
+  ],
+  "gate_decision": {
+    "strong_encoder_mixed_signal": {
+      "status": "partial_pass",
+      "evidence": "DINOv2-S raises mixed quad from 20.45 to 25.12 percent."
+    },
+    "main_layereddepth_performance": {
+      "status": "fail",
+      "evidence": "DINO all-quad 32.91 percent is below MiDaS 34.84 percent and SeeGroup 72.41 percent."
+    },
+    "seegroup_output_teacher": {
+      "status": "reject",
+      "evidence": "Synthetic metric-depth MAE 5.65 m and presence F1 0.593 fail the target-quality audit."
+    },
+    "simple_metric_scale_correction": {
+      "status": "fail",
+      "evidence": "Even oracle-input per-frame background anchoring reaches only 1.693 percent ShellBench interface F1."
+    },
+    "action_utility": {
+      "status": "fail",
+      "evidence": "Anchored K-event parity is 211 safe, 2 collision, 31 rejected versus GT full 244, 0, 0."
+    },
+    "transition_and_learned_planner": {
+      "status": "deferred",
+      "evidence": "Upstream shell-interface quality remains below the gate."
+    },
+    "current_branch": {
+      "status": "verified_stop",
+      "evidence": "Encoder, output-teacher, simple scale, interface, and action diagnostics have all reached a controlled decision."
+    }
+  },
+  "recommended_next_experiment": {
+    "decision": "start_domain_aligned_multidomain_pilot_not_more_baseline_reproduction",
+    "available_data_audit": {
+      "tablewarenet_object_num_4_training_scenes": 3000,
+      "tablewarenet_object_num_4_validation_scenes": 100,
+      "tablewarenet_object_num_4_test_scenes": 100,
+      "test_policy": "keep frozen until one configuration is selected"
+    },
+    "steps": [
+      "Export physical-shell multi-interface supervision from TablewareNet training scenes only and begin with a deterministic small pilot.",
+      "Use the independent TablewareNet validation scenes for model selection and calibration; do not touch the existing test set.",
+      "Jointly retain LayeredDepth-Syn ordering supervision and add TablewareNet in-domain metric/interface supervision.",
+      "Scale to all 3000 training scenes only after a validation interface gate is frozen and passed.",
+      "Run the frozen test and planner once; add transition labels or a learned planner only if both interface and action metrics improve."
+    ]
+  },
+  "verification": {
+    "dhp_unit_tests": "13_of_13_pass",
+    "depth4tom_evaluator_tests": "4_of_4_pass",
+    "layereddepth_evaluator_tests": "9_of_9_pass",
+    "benchmark_manifest_tests": "3_of_3_pass",
+    "shellbench_unit_tests": "17_of_17_pass",
+    "shellbench_integration_tests": "2_of_2_pass",
+    "python_compile": "pass",
+    "anchor_prediction_files": 700,
+    "anchor_prediction_structure_spot_check": "finite_positive_ordered_depth_and_monotone_presence_pass",
+    "hard_denominators": {
+      "layereddepth_samples": 300,
+      "layereddepth_prediction_files": 1200,
+      "shellbench_matched_objects": 259,
+      "shellbench_rays": 139238400,
+      "planner_matched_objects": 244,
+      "planner_candidates": 7983
+    }
+  }
+}

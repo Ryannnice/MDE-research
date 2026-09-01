@@ -2,13 +2,19 @@
 
 当前主线是 [Shell-Aware Multi-Layer Transparent Grasping](../Shell-Aware-Multi-Layer-Transparent-Grasping-Idea-v2.md)。最新、最易读的状态与数字统一见：
 
+- [DepthHypothesisPack v1：强编码器、teacher 与尺度诊断（2026-08-31）](DepthHypothesisPack_v1_强编码器与尺度诊断_2026-08-31.md)
+- [DepthHypothesisPack v0：正式实验记录（2026-08-31）](DepthHypothesisPack_v0_实验记录_2026-08-31.md)
 - [复现进度总览（2026-08-30）](复现进度总览_2026-08-30.md)
 - [G0 执行总控](G0_执行总控.md)
 - [P0 单层/多层 gap table](P0_gap_table.md)
 
 ## 当前结论
 
-截至 2026-08-30：
+截至 2026-08-31：
+
+- DepthHypothesisPack v0/v1 的 ResNet-18、DINOv2-S 与 Depth Anything V2-S 受控实验已完成。DINO 将 LayeredDepth mixed-quad 从 20.45% 提到 25.12%，但直接 TablewareNet interface F1 仅 0.422%。
+- SeeGroup 继续作为真实 multi-layer strong baseline；其 synthetic raw metric/presence teacher target 未过质量 gate，因此没有启动错误蒸馏。
+- 带 GT-union-mask 的背景深度 affine oracle 将 DINO interface F1 提到 1.693%，planner parity 为 211 safe / 2 collision / 31 reject，仍未过主 gate。下一步应使用 TablewareNet training/validation 做域对齐训练，test 保持冻结。
 
 - TransCG official test 已完整下载并审计：52 scenes，23,524 samples；不再受 Google Drive 配额阻塞。
 - ReMake 已按原生入口跑完 23,524 张，masked 指标在论文 Table I 报告精度内一致。

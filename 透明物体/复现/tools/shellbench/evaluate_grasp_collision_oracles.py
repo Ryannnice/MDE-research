@@ -51,6 +51,16 @@ def parse_args() -> argparse.Namespace:
             "adds optimistic/conservative collision policies on the same candidates"
         ),
     )
+    parser.add_argument(
+        "--multi-depth-root",
+        action="append",
+        default=[],
+        metavar="LABEL=DIR",
+        help=(
+            "repeatable K-layer ShellBench adapter; adds first-layer controls "
+            "and ordered-event parity on the same frozen candidates"
+        ),
+    )
     parser.add_argument("--max-centre-distance-m", type=float, default=0.10)
     parser.add_argument("--surface-band-m", type=float, default=0.002)
     parser.add_argument("--gripper-points", type=int, default=2048)
@@ -74,19 +84,19 @@ def load_json(path: Path) -> Any:
         return json.load(handle)
 
 
-def parse_labeled_roots(values: list[str]) -> dict[str, Path]:
+def parse_labeled_roots(values: list[str], argument_name: str) -> dict[str, Path]:
     roots: dict[str, Path] = {}
     for value in values:
         if "=" not in value:
-            raise ValueError(f"single-depth-root must be LABEL=DIR, got {value!r}")
+            raise ValueError(f"{argument_name} must be LABEL=DIR, got {value!r}")
         label, raw_path = value.split("=", 1)
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", label):
-            raise ValueError(f"Invalid single-depth label: {label!r}")
+            raise ValueError(f"Invalid {argument_name} label: {label!r}")
         if label in roots:
-            raise ValueError(f"Duplicate single-depth label: {label}")
+            raise ValueError(f"Duplicate {argument_name} label: {label}")
         root = Path(raw_path).expanduser().resolve()
         if not (root / "manifest.json").is_file() or not (root / "metrics.json").is_file():
-            raise FileNotFoundError(f"Not a completed single-depth ShellBench adapter: {root}")
+            raise FileNotFoundError(f"Not a completed ShellBench adapter: {root}")
         roots[label] = root
     return roots
 
@@ -458,17 +468,34 @@ def main() -> None:
     gt_root = args.ground_truth_root.resolve()
     objects_root = args.prediction_objects_root.resolve()
     output_json = args.output_json.resolve()
-    single_depth_roots = parse_labeled_roots(args.single_depth_root)
+    single_depth_roots = parse_labeled_roots(args.single_depth_root, "single-depth-root")
+    multi_depth_roots = parse_labeled_roots(args.multi_depth_root, "multi-depth-root")
+    duplicate_labels = set(single_depth_roots) & set(multi_depth_roots)
+    if duplicate_labels:
+        raise ValueError(f"Labels occur in both source groups: {sorted(duplicate_labels)}")
     single_depth_metadata = {
         label: load_json(root / "metrics.json")
         for label, root in single_depth_roots.items()
+    }
+    multi_depth_metadata = {
+        label: load_json(root / "metrics.json")
+        for label, root in multi_depth_roots.items()
     }
     single_depth_policies = [
         f"{label}_fixed_{unknown_policy}"
         for label in single_depth_roots
         for unknown_policy in ("conservative", "optimistic")
     ]
-    evaluation_policies = [*POLICIES, *single_depth_policies]
+    multi_depth_policies = [
+        policy
+        for label in multi_depth_roots
+        for policy in (
+            f"{label}_front_fixed_conservative",
+            f"{label}_front_fixed_optimistic",
+            f"{label}_events_fixed_parity",
+        )
+    ]
+    evaluation_policies = [*POLICIES, *single_depth_policies, *multi_depth_policies]
     if not (official_root / "tablewarenet" / "tableware.py").is_file():
         raise FileNotFoundError(f"Not a T²SQNet checkout: {official_root}")
     gt_payload = load_json(gt_root / "manifest.json")
@@ -616,6 +643,45 @@ def main() -> None:
                 candidate_predictions[f"{label}_fixed_optimistic"] = single_collision[
                     "gt_front_fixed_optimistic"
                 ].tolist()
+            for label, root in multi_depth_roots.items():
+                multi_depth_events: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
+                for item in view_items:
+                    view_index = int(item["view_index"])
+                    event_path = (
+                        root
+                        / "events"
+                        / f"{scene_id}_prediction{gt_list_index}_view{view_index}.npz"
+                    )
+                    if not event_path.is_file():
+                        raise FileNotFoundError(
+                            f"Multi-depth source {label} is missing {event_path}"
+                        )
+                    with np.load(event_path) as payload:
+                        multi_depth_events.append(
+                            (
+                                payload["depths_m"],
+                                payload["valid_mask"],
+                                payload.get(
+                                    "transition_type",
+                                    np.zeros_like(payload["depths_m"], dtype=np.int8),
+                                ),
+                            )
+                        )
+                multi_collision, _ = collision_predictions_batch(
+                    points_world,
+                    cameras,
+                    multi_depth_events,
+                    args.surface_band_m,
+                )
+                candidate_predictions[f"{label}_front_fixed_conservative"] = (
+                    multi_collision["gt_front_fixed_conservative"].tolist()
+                )
+                candidate_predictions[f"{label}_front_fixed_optimistic"] = (
+                    multi_collision["gt_front_fixed_optimistic"].tolist()
+                )
+                candidate_predictions[f"{label}_events_fixed_parity"] = (
+                    multi_collision["gt_events_fixed_parity"].tolist()
+                )
             projected_views = counts["projected_point_views"].tolist()
             ground_truth_collision = candidate_predictions["gt_events_fixed_parity"]
             has_safe_candidate = any(not value for value in ground_truth_collision)
@@ -700,8 +766,8 @@ def main() -> None:
     output = {
         "benchmark": "TablewareNet target-shell grasp-collision oracle",
         "run_kind": (
-            "oracle_and_single_depth_models_on_supplied_corrected_ground_truth_manifest"
-            if single_depth_roots
+            "oracle_and_model_events_on_supplied_corrected_ground_truth_manifest"
+            if single_depth_roots or multi_depth_roots
             else "oracle_on_supplied_corrected_ground_truth_manifest"
         ),
         "scope": "offline collision gate only; no IK, furniture, other-object collision, execution, or robot task-success claim",
@@ -723,6 +789,23 @@ def main() -> None:
             }
             for label, metadata in single_depth_metadata.items()
         },
+        "multi_depth_collision_adapters_use_ground_truth": bool(multi_depth_roots),
+        "multi_depth_adapter_scope": (
+            "GT object identity/association and GT rendered first-surface visibility; "
+            "ordered predicted interfaces use fixed parity because v0 has no transition labels"
+            if multi_depth_roots
+            else None
+        ),
+        "multi_depth_sources": {
+            label: {
+                "root": str(multi_depth_roots[label]),
+                "method": metadata.get("method"),
+                "input_protocol": metadata.get("input_protocol"),
+                "adapter_oracles": metadata.get("adapter_oracles"),
+                "transition_semantics": metadata.get("transition_semantics"),
+            }
+            for label, metadata in multi_depth_metadata.items()
+        },
         "ground_truth_collision_definition": "odd parity of all corrected TablewareNet shell intersections, fused conservatively across seven views",
         "camera_image_size_contract": "TablewareNet [height, width]",
         "evaluation_denominator": {
@@ -741,6 +824,18 @@ def main() -> None:
         | {
             f"{label}_fixed_optimistic": f"only a +/- {args.surface_band_m} m band around this model's visible single-depth event is occupied"
             for label in single_depth_roots
+        }
+        | {
+            f"{label}_front_fixed_conservative": "all space behind this model's first predicted interface is occupied"
+            for label in multi_depth_roots
+        }
+        | {
+            f"{label}_front_fixed_optimistic": f"only a +/- {args.surface_band_m} m band around this model's first predicted interface is occupied"
+            for label in multi_depth_roots
+        }
+        | {
+            f"{label}_events_fixed_parity": "occupancy toggles at each ordered predicted interface; transition types are not used"
+            for label in multi_depth_roots
         },
         "frozen_planner": {
             "gripper_points": args.gripper_points,

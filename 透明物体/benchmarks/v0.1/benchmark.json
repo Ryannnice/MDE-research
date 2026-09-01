@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "transparent-shell-v0.1",
+  "frozen_at": "2026-08-31",
+  "project_commit": "57f4d3f880ddde7da294519581a2b8d5a387c528",
+  "result_origin_contract": {
+    "native_reproduction": "Official data, released checkpoint and native evaluator.",
+    "unified_benchmark": "Common local protocol; never reported as a source-paper number.",
+    "oracle_diagnostic": "Capacity or representation diagnostic; never reported as a deployable model score."
+  },
+  "frozen_files": [
+    {
+      "path": "透明物体/复现/baseline_results_2026-08-30.json",
+      "sha256": "4786251ed1898638e93bf077ea3eb1f54961e70557d3cb407d0d10264087b29b"
+    },
+    {
+      "path": "透明物体/复现/tools/layereddepth/evaluate_predictions.py",
+      "sha256": "9aa92b5d8c45bc026381b87e6a42c00ad2edcf3b77530b1f21c3708e7a2e403b"
+    },
+    {
+      "path": "透明物体/复现/tools/shellbench/evaluate_ray_events.py",
+      "sha256": "6530570397cbdd6551c9773ef4367d09e1c42840bdca62e12b1f0414a54a13bb"
+    },
+    {
+      "path": "透明物体/复现/tools/shellbench/evaluate_grasp_collision_oracles.py",
+      "sha256": "1dcad921617141b62042b4788433b4444681952809e6e9ffdb12d7121b217132"
+    },
+    {
+      "path": "透明物体/external/layereddepth/official/evaluate.py",
+      "sha256": "645947a27c47ca35fea18f28714780de63472fd9b038cb926c5ab969f1f380a3"
+    }
+  ],
+  "frozen_result_invariants": [
+    {"path": "p0.booster.samples", "value": 228},
+    {"path": "p0.layereddepth_validation.samples", "value": 300},
+    {"path": "p0.layereddepth_validation.tuple_denominators.layer_all_mixed_quads", "value": 195800},
+    {"path": "transcg.scenes", "value": 52},
+    {"path": "transcg.samples", "value": 23524},
+    {"path": "shellbench.ground_truth.dataset_scenes", "value": 100},
+    {"path": "shellbench.ground_truth.hollow_scored_scenes", "value": 98},
+    {"path": "shellbench.ground_truth.hollow_objects", "value": 259},
+    {"path": "shellbench.ground_truth.object_view_event_maps", "value": 1813},
+    {"path": "shellbench.ground_truth.rays", "value": 139238400},
+    {"path": "shellbench.fixed_planner_oracle.matched_objects", "value": 244},
+    {"path": "shellbench.fixed_planner_oracle.candidates", "value": 7983}
+  ],
+  "evaluation_splits": {
+    "layereddepth_real_validation": {
+      "role": "evaluation_only",
+      "allow_training": false,
+      "samples": 300,
+      "dataset_revision": "a2aad776030144950f8cbc2f12e2903b26316ff8",
+      "subsets": ["layer_first", "layer_all"]
+    },
+    "booster_balanced": {
+      "role": "evaluation_only",
+      "allow_training": false,
+      "samples": 228,
+      "protocol": "Depth4ToM Base official alignment/evaluation"
+    },
+    "transcg_official_test": {
+      "role": "evaluation_only",
+      "allow_training": false,
+      "scenes": 52,
+      "samples": 23524
+    },
+    "tablewarenet_shellbench": {
+      "role": "evaluation_only",
+      "allow_training": false,
+      "scenes": 100,
+      "hollow_scored_scenes": 98,
+      "camera_image_size": [240, 320],
+      "camera_image_size_order": "height_width",
+      "candidate_source": "T2SQNet GT-mask predicted objects plus official primitive grasp planner",
+      "matched_objects": 244,
+      "frozen_candidates": 7983
+    }
+  },
+  "training_sources": {
+    "layereddepth_syn": {
+      "role": "training_only",
+      "allow_evaluation_claim": false,
+      "hf_dataset": "princeton-vl/LayeredDepth-Syn",
+      "hf_split": "train",
+      "hf_revision": "78fd900929879332e60d7190d9bd423b8432669b",
+      "examples": 14800,
+      "shards": 56,
+      "rgb_field": "image.png",
+      "depth_fields": ["depth_1.png", "depth_3.png", "depth_5.png", "depth_7.png"],
+      "depth_encoding": "uint16 millimetres; zero is invalid",
+      "model_units": "metres"
+    }
+  },
+  "model_output_contract": {
+    "max_hypotheses": 4,
+    "depth_units": "metres",
+    "depth_order": "strictly nondecreasing for present hypotheses",
+    "fields": ["depth", "presence_probability", "uncertainty"],
+    "interface_transition_semantics": "deferred_after_v0_gate"
+  },
+  "reporting_contract": {
+    "main_tables": [
+      "TransCG metric depth completion",
+      "LayeredDepth multi-layer relative depth",
+      "ShellBench multi-interface and fixed-planner collision"
+    ],
+    "forbid_cross_protocol_ranking": true,
+    "layereddepth_test_submission_only_after_validation_freeze": true
+  }
+}
